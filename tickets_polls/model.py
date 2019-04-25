@@ -26,6 +26,8 @@ class Model:
 
     @property
     def str_id(self):
+        if self._id is None:
+            return ''
         return str(self._id)
 
     @str_id.setter
@@ -34,6 +36,8 @@ class Model:
 
     @property
     def create_time(self):
+        if self._id is None:
+            return None
         return self._id.generation_time.astimezone()
 
     def mongo_json(self):
