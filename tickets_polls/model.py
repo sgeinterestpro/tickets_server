@@ -25,14 +25,20 @@ class Model:
                 self.__setattr__('_{}'.format(key), kwargs[key])
 
     @property
+    def object_id(self):
+        if self._id is None:
+            return
+        return self._id
+
+    @object_id.setter
+    def object_id(self, id_):
+        self._id = ObjectId(id_)
+
+    @property
     def str_id(self):
         if self._id is None:
             return ''
         return str(self._id)
-
-    @str_id.setter
-    def str_id(self, id_):
-        self._id = ObjectId(id_)
 
     @property
     def create_time(self):
@@ -45,17 +51,48 @@ class Model:
 
     def api_json(self):
         json = {'id': self.str_id}
-        json.update(self.mongo_json())
+        for key in self.fled_list:
+            value = self.__getattribute__('_{}'.format(key))
+            if value is None:
+                pass
+            elif type(value) == ObjectId:
+                value = str(value)
+            json.update({key: value})
         return json
 
 
 class Ticket(Model):
-    fled_list = ['class', 'title', 'date', 'state']
+    fled_list = ['class', 'title', 'date', 'state', 'user']
     fled_default = {
         'state': 'unused'
     }
+
+    @property
+    def user(self):
+        return self.__getattribute__('_user')
+
+    @user.setter
+    def user(self, value):
+        """
+
+        :type value: User
+        """
+        self.__setattr__('_user', value.object_id)
 
 
 class User(Model):
     fled_list = ['open-id']
     fled_default = {}
+
+    @staticmethod
+    async def find_or_insert_one(db, data):
+        user_mongo = await db.user.find_one(data)
+        if user_mongo is None:
+            user = User(**data)
+            res = await db.user.insert_one(user.mongo_json())
+            if res.inserted_id is None:
+                pass
+            user.object_id = res.inserted_id
+        else:
+            user = User(**user_mongo)
+        return user
