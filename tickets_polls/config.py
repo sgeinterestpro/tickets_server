@@ -1,3 +1,9 @@
+"""
+filename: config.py
+datetime: 2019-04-22
+author: muumlover
+"""
+
 import pathlib
 
 import yaml
@@ -6,8 +12,6 @@ import yaml
 def load_config(config_path):
     with open(config_path, 'r') as f:
         cfg = f.read()
-        print(type(cfg))  # 读出来是字符串
-        print(cfg)
         config = yaml.load(cfg, Loader=yaml.BaseLoader)  # 用load方法转字典
     return config
 
