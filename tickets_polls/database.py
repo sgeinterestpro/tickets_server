@@ -1,3 +1,9 @@
+"""
+filename: database.py
+datetime: 2019-04-22
+author: muumlover
+"""
+
 from urllib.parse import quote_plus
 
 from motor.motor_asyncio import AsyncIOMotorClient

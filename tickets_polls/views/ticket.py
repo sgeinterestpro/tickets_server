@@ -1,10 +1,17 @@
-from aiohttp import web
-from bson import ObjectId
+"""
+filename: ticket.py
+datetime: 2019-04-22
+author: muumlover
+"""
 
+from aiohttp import web
+
+from model import Ticket
 from unit import get_this_week_start, get_this_week_end
 
 
 class TicketRouter(web.View):
+
     async def get(self):
         ticket_id = self.request.match_info.get('ticket_id', None)
         if ticket_id is None:
@@ -37,58 +44,6 @@ class TicketRouter(web.View):
         else:
             # 删除一个 ticket
             return await TicketHandle(ticket_id).delete(self.request)
-
-
-class Ticket:
-    """
-    票券对象
-    """
-    fled_need = ['class', 'title', 'date']
-
-    def __init__(self, **kwargs) -> None:
-        for key in self.fled_need:
-            if key not in kwargs:
-                kwargs[key] = None
-        self._class = kwargs['class']
-        self._title = kwargs['title']
-        self._date = kwargs['date']
-
-        if '_id' in kwargs:
-            self._id = kwargs['_id']
-            self._state = kwargs['state']
-        else:
-            self._id = None
-            self._state = 'unused'
-        pass
-
-    @property
-    def str_id(self):
-        return str(self._id)
-
-    @str_id.setter
-    def str_id(self, id_):
-        self._id = ObjectId(id_)
-
-    @property
-    def create_time(self):
-        return self._id.generation_time.astimezone()
-
-    def mongo_json(self):
-        return {
-            'class': self._class,
-            'title': self._title,
-            'state': self._state,
-            'date': self._date,
-        }
-
-    def api_json(self):
-        return {
-            'id': self.str_id,
-            'class': self._class,
-            'title': self._title,
-            'state': self._state,
-            'date': self._date,
-        }
 
 
 class TicketHandle:
