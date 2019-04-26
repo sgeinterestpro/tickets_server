@@ -62,22 +62,22 @@ class Model:
 
 
 class Ticket(Model):
-    fled_list = ['class', 'title', 'date', 'state', 'user']
+    fled_list = ['class', 'title', 'date', 'state', 'user_id']
     fled_default = {
         'state': 'unused'
     }
 
     @property
-    def user(self):
-        return self.__getattribute__('_user')
+    def user_id(self):
+        return self.__getattribute__('_user_id')
 
-    @user.setter
-    def user(self, value):
+    @user_id.setter
+    def user_id(self, value):
         """
 
         :type value: User
         """
-        self.__setattr__('_user', value.object_id)
+        self.__setattr__('_user_id', value)
 
 
 class User(Model):
