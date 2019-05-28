@@ -3,6 +3,7 @@ filename: ticket.py
 datetime: 2019-04-22
 author: muumlover
 """
+import time
 from datetime import datetime
 
 from aiohttp import web
@@ -66,10 +67,10 @@ class TicketHandle:
             return web.json_response({'code': -1, 'message': '未找到此票券'})
         ticket = Ticket(**ticket_doc)
         user_doc = await db.user.find_one({
-            '_id': ticket.user_id
+            '_id': ticket['purchaser']
         })
         user = User(**user_doc)
-        return web.json_response({'code': 0, 'ticket': ticket.api_json(), 'user': user.api_json()})
+        return web.json_response({'code': 0, 'ticket': ticket.to_json(), 'user': user.to_json()})
 
     async def used(self, request):
         """
@@ -82,7 +83,7 @@ class TicketHandle:
         ticket_doc = await db.ticket.find_one({
             '_id': ObjectId(self.ticket_id),
         })
-        
+
         if ticket_doc is None:
             return web.json_response({'code': -1, 'message': '此券不存在'})
         if ticket_doc['state'] == 'used':
@@ -97,7 +98,7 @@ class TicketHandle:
         if ticket_doc['date'] > date_now:
             return web.json_response({'code': -1, 'message': '此券未生效'})
 
-        user = await User.find_or_insert_one(db, {'open-id': request['open-id']})
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
         res = await db.ticket.update_one({
             '_id': ObjectId(self.ticket_id)
         }, {
@@ -118,7 +119,7 @@ class TicketHandle:
         """
         # todo 判断票券状态是否为已使用或已过期
         db = request.app['db']
-        user = await User.find_or_insert_one(db, {'open-id': request['open-id']})
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
         res = await db.ticket.delete_one({
             'user_id': user.object_id,
             '_id': ObjectId(self.ticket_id)
@@ -136,7 +137,7 @@ class TicketHandle:
         """
         db = request.app['db']
         # 获取用户信息
-        user = await User.find_or_insert_one(db, {'open-id': request['open-id']})
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
         data = await request.json()
         # 检查本周领取限额
         this_week_start = date_week_start().strftime('%Y-%m-%d')
@@ -156,8 +157,8 @@ class TicketHandle:
                 return web.json_response({'code': -1, 'message': '所选日期无法领取'})
         # 生成票券
         ticket = Ticket(**data)
-        ticket.user_id = user.object_id
-        res = await db.ticket.insert_one(ticket.mongo_json())
+        ticket.purchaser = user.object_id
+        res = await db.ticket.insert_one(ticket.to_object())
         if res.inserted_id is None:
             return web.json_response({'code': -3, 'message': '生成票券失败'})
         data['id'] = str(res.inserted_id)
@@ -171,7 +172,7 @@ class TicketHandle:
         :return:
         """
         db = request.app['db']
-        user = await User.find_or_insert_one(db, {'open-id': request['open-id']})
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
         this_week_start = date_week_start().strftime('%Y-%m-%d')
         this_week_end = date_week_end().strftime('%Y-%m-%d')
         cursor = db.ticket.find({
@@ -183,7 +184,7 @@ class TicketHandle:
         # for ticket in await cursor.to_list(length=100):
         async for ticket_doc in cursor:
             ticket = Ticket(**ticket_doc)
-            data['items'].append(ticket.api_json())
+            data['items'].append(ticket.to_json())
             data['count'] += 1
 
         return web.json_response(data)
@@ -217,3 +218,209 @@ class TicketHandle:
         # }
         # return web.json_response(data)
         # # return web.HTTPFound('/')
+
+
+class TicketHandles:
+
+    @staticmethod
+    async def ticket_package(request):
+        """
+        获取用户拥有的票券
+        :param request:
+        :return:
+        """
+        db = request.app['db']
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        this_week_start = date_week_start().strftime('%Y-%m-%d')
+        this_week_end = date_week_end().strftime('%Y-%m-%d')
+        cursor = db.ticket.find({
+            'purchaser': user.object_id,
+            'expiry_date': {'$gte': this_week_start, '$lte': this_week_end}
+        })
+
+        data = {'count': 0, 'items': []}
+        # for ticket in await cursor.to_list(length=100):
+        async for ticket_doc in cursor:
+            ticket = Ticket(**ticket_doc)
+            data['items'].append(ticket.to_json())
+            data['count'] += 1
+
+        return web.json_response(data)
+
+    @staticmethod
+    async def ticket_purchase(request):
+        """
+        申请领取一张票券
+        :param request:
+        :return:
+        """
+        db = request.app['db']
+
+        # 获取用户信息
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        data = await request.json()
+
+        # 检查本周领取限额
+        this_week_start = date_week_start().strftime('%Y-%m-%d')
+        this_week_end = date_week_end().strftime('%Y-%m-%d')
+        count = await db.ticket.count_documents({
+            'purchaser': user.object_id,
+            'purch_time': {'$gte': this_week_start, '$lte': this_week_end}
+        })
+        if count >= 3:
+            return web.json_response({'code': -1, 'message': '已超过本周领取限额'})
+
+        # 检查领取日期
+        if 'date' not in data:
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
+        else:
+            date_now = datetime.now().strftime('%Y-%m-%d')
+            if not date_now <= data['date'] <= this_week_end:
+                return web.json_response({'code': -1, 'message': '所选日期无法领取'})
+
+        # 领取票券
+        # ticket = Ticket(**data)
+        # ticket.user_id = user.object_id
+        # res = await db.ticket.insert_one(ticket.to_object())
+        res = await db.ticket.update_one({
+            'state': 'default'
+        }, {
+            '$set': {
+                'class': data['class'],
+                'state': 'valid',
+                'purchaser': user.object_id,
+                'purch_time': datetime.now(),
+                'expiry_date': data['date']
+            }
+        })
+
+        if res.matched_count == 0:
+            return web.json_response({'code': -1, 'message': '没有可领取的票券'})
+        if res.modified_count == 0:
+            return web.json_response({'code': -2, 'message': '更新票券信息失败'})
+        return web.json_response({'code': 0, 'message': '票券领取成功'})
+
+    @staticmethod
+    async def ticket_refund(request):
+        """
+        申请退回一张票券
+        :param request:
+        :return:
+        """
+        # todo 判断票券状态是否为已使用或已过期
+        db = request.app['db']
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        data = await request.json()
+        if 'ticket_id' not in data:
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
+
+        res = await db.ticket.update_one({
+            '_id': data['ticket_id'],
+            'state': 'valid',
+            'purchaser': user.object_id
+        }, {
+            '$set': {
+                'class': None,
+                'state': 'default',
+                'purchaser': None,
+                'purch_time': None,
+                'expiry_date': None
+            }
+        })
+
+        if res.matched_count == 0:
+            return web.json_response({'code': -2, 'message': '找不到对应的票券'})
+        if res.modified_count == 0:
+            return web.json_response({'code': -2, 'message': '更新票券信息失败'})
+        return web.json_response({'code': 0, 'message': '票券删除成功'})
+
+    @staticmethod
+    async def ticket_inspect(request):
+        """
+        获取 ticket 信息
+        :param request:
+        :return:
+        """
+        db = request.app['db']
+        data = await request.json()
+        if 'ticket_id' not in data:
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
+
+        ticket_doc = await db.ticket.find_one({
+            '_id': data['ticket_id'],
+        })
+        if ticket_doc is None:
+            return web.json_response({'code': -1, 'message': '未找到此票券'})
+
+        ticket = Ticket(**ticket_doc)
+        user_doc = await db.user.find_one({
+            '_id': ticket['purchaser']
+        })
+        user = User(**user_doc)
+        return web.json_response({'code': 0, 'ticket': ticket.to_json(), 'user': user.to_json()})
+
+    @staticmethod
+    async def ticket_checked(request):
+        """
+        使用 ticket
+        :param request:
+        :return:
+        """
+        # Todo
+        db = request.app['db']
+        data = await request.json()
+        if 'ticket_id' not in data:
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
+
+        ticket_doc = await db.ticket.find_one({
+            '_id': data['ticket_id'],
+        })
+        if ticket_doc is None:
+            return web.json_response({'code': -1, 'message': '此券不存在'})
+        if ticket_doc['state'] == 'verified':
+            return web.json_response({'code': -1, 'message': '此券已被使用'})
+        if ticket_doc['state'] == 'expired':
+            return web.json_response({'code': -1, 'message': '此券已过期'})
+        if ticket_doc['state'] != 'valid':
+            return web.json_response({'code': -1, 'message': '此券状态异常'})
+        date_now = datetime.now().strftime('%Y-%m-%d')
+        if ticket_doc['expiry_date'] < date_now:
+            return web.json_response({'code': -1, 'message': '此券已过期'})
+        if ticket_doc['expiry_date'] > date_now:
+            return web.json_response({'code': -1, 'message': '此券未生效'})
+
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        res = await db.ticket.update_one({
+            '_id': data['ticket_id']
+        }, {
+            '$set': {
+                'state': 'verified',
+                'checker': user.object_id,
+                'check_time': datetime.now()
+            }
+        })
+        if res.matched_count == 0:
+            return web.json_response({'code': -2, 'message': '找不到对应的票券'})
+        if res.modified_count == 0:
+            return web.json_response({'code': -2, 'message': '更新票券信息失败'})
+        return web.json_response({'code': 0, 'message': '票券使用成功'})
+
+    @staticmethod
+    async def ticket_generate(request):
+        db = request.app['db']
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        data = await request.json()
+        if 'count' not in data:
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
+        ticket_id_base = 'SGE{time}{rnd}%05d'.format(
+            time=datetime.now().strftime('%Y%m%d'),
+            rnd=str(int(time.time()) % 86400).zfill(5)
+        )
+        raise_time = datetime.now()
+        new_ticket_list = [Ticket(_id=ticket_id_base % index,
+                                  raiser=user.object_id,
+                                  raise_time=raise_time).to_object(True) for index in range(data['count'])]
+        res = await db.ticket.insert_many(new_ticket_list)
+        if len(res.inserted_ids) == 0:
+            return web.json_response({'code': -3, 'message': '生成票券失败'})
+        return web.json_response({'code': 0, 'message': '生成票券成功', 'data': data})

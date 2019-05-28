@@ -4,6 +4,8 @@ datetime: 2019-04-25
 author: muumlover
 """
 
+from datetime import datetime
+
 from bson import ObjectId
 
 
@@ -24,64 +26,71 @@ class Model:
             else:
                 self.__setattr__('_{}'.format(key), kwargs[key])
 
+    def __getitem__(self, item):
+        return self.__getattribute__('_{}'.format(item))
+
+    def __setitem__(self, key, value):
+        return self.__setattr__('_{}'.format(key), value)
+
     @property
     def object_id(self):
         if self._id is None:
             return
         return self._id
 
-    @object_id.setter
-    def object_id(self, id_):
-        self._id = ObjectId(id_)
-
     @property
-    def str_id(self):
+    def json_id(self):
         if self._id is None:
             return ''
         return str(self._id)
 
-    @property
-    def create_time(self):
-        if self._id is None:
-            return None
-        return self._id.generation_time.astimezone()
+    # @property
+    # def create_time(self):
+    #     if self._id is None:
+    #         return None
+    #     return self._id.generation_time.astimezone()
 
-    def mongo_json(self):
-        return {key: self.__getattribute__('_{}'.format(key)) for key in self.fled_list}
+    def to_object(self, include_id=False):
+        json = {}
+        if include_id:
+            json.update({'_id': self.object_id})
+        for key in self.fled_list:
+            json.update({key: self.__getattribute__('_{}'.format(key))})
+        return json
 
-    def api_json(self):
-        json = {'id': self.str_id}
+    def to_json(self):
+        json = {'_id': self.json_id}
         for key in self.fled_list:
             value = self.__getattribute__('_{}'.format(key))
             if value is None:
                 pass
             elif type(value) == ObjectId:
                 value = str(value)
+            elif type(value) == datetime:
+                value = str(value)
             json.update({key: value})
         return json
 
 
 class Ticket(Model):
-    fled_list = ['class', 'title', 'date', 'state', 'user_id']
+    fled_list = ['class', 'state', 'raiser', 'raise_time', 'purchaser', 'purch_time', 'expiry_date', 'overdue_time',
+                 'checker', 'check_time']
     fled_default = {
-        'state': 'unused'
+        'class': None,
+        'state': 'default',
+        'raiser': None,
+        'raise_time': None,
+        'purchaser': None,
+        'purch_time': None,
+        'expiry_date': None,
+        'overdue_time': None,
+        'checker': None,
+        'check_time': None
     }
-
-    @property
-    def user_id(self):
-        return self.__getattribute__('_user_id')
-
-    @user_id.setter
-    def user_id(self, value):
-        """
-
-        :type value: User
-        """
-        self.__setattr__('_user_id', value)
 
 
 class User(Model):
-    fled_list = ['open-id']
+    fled_list = ['wx_open_id']
     fled_default = {}
 
     @staticmethod
@@ -89,10 +98,10 @@ class User(Model):
         user_mongo = await db.user.find_one(data)
         if user_mongo is None:
             user = User(**data)
-            res = await db.user.insert_one(user.mongo_json())
+            res = await db.user.insert_one(user.to_object())
             if res.inserted_id is None:
                 pass
-            user.object_id = res.inserted_id
+            user['id'] = res.inserted_id
         else:
             user = User(**user_mongo)
         return user
