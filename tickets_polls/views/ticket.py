@@ -85,18 +85,18 @@ class TicketHandle:
         })
 
         if ticket_doc is None:
-            return web.json_response({'code': -1, 'message': '此券不存在'})
+            return web.json_response({'code': -1, 'message': '票券不存在'})
         if ticket_doc['state'] == 'used':
-            return web.json_response({'code': -1, 'message': '此券已被使用'})
+            return web.json_response({'code': -1, 'message': '票券已被使用'})
         if ticket_doc['state'] == 'expired':
-            return web.json_response({'code': -1, 'message': '此券已过期'})
+            return web.json_response({'code': -1, 'message': '票券已过期'})
         if ticket_doc['state'] != 'unused':
-            return web.json_response({'code': -1, 'message': '此券状态异常'})
+            return web.json_response({'code': -1, 'message': '票券状态异常'})
         date_now = datetime.now().strftime('%Y-%m-%d')
         if ticket_doc['date'] < date_now:
-            return web.json_response({'code': -1, 'message': '此券已过期'})
+            return web.json_response({'code': -1, 'message': '票券已过期'})
         if ticket_doc['date'] > date_now:
-            return web.json_response({'code': -1, 'message': '此券未生效'})
+            return web.json_response({'code': -1, 'message': '票券未生效'})
 
         user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
         res = await db.ticket.update_one({
@@ -106,9 +106,9 @@ class TicketHandle:
         })
 
         if res.matched_count == 0:
-            return web.json_response({'code': -2, 'message': '此券不存在'})
+            return web.json_response({'code': -2, 'message': '票券不存在'})
         if res.modified_count == 0:
-            return web.json_response({'code': -2, 'message': '此券已被使用'})
+            return web.json_response({'code': -2, 'message': '票券已被使用'})
         return web.json_response({'code': 0, 'message': '状态更新成功'})
 
     async def delete(self, request):
@@ -353,11 +353,28 @@ class TicketHandles:
             return web.json_response({'code': -1, 'message': '未找到此票券'})
 
         ticket = Ticket(**ticket_doc)
+
+        if ticket['state'] == 'default':
+            return web.json_response({'code': -1, 'message': '票券未激活'})
+        if ticket['state'] == 'verified':
+            return web.json_response({'code': -1, 'message': '票券已被使用'})
+        if ticket['state'] == 'expired':
+            return web.json_response({'code': -1, 'message': '票券已过期'})
+        if ticket['state'] == 'invalid':
+            return web.json_response({'code': -1, 'message': '票券已作废'})
+        if ticket['state'] != 'valid':
+            return web.json_response({'code': -1, 'message': '票券状态异常'})
+        date_now = datetime.now().strftime('%Y-%m-%d')
+        if ticket['state'] < date_now:
+            return web.json_response({'code': -1, 'message': '票券已过期'})
+        if ticket['state'] > date_now:
+            return web.json_response({'code': -1, 'message': '票券未生效'})
+
         user_doc = await db.user.find_one({
             '_id': ticket['purchaser']
         })
         user = User(**user_doc)
-        return web.json_response({'code': 0, 'ticket': ticket.to_json(), 'user': user.to_json()})
+        return web.json_response({'code': 0, 'message': '票券状态核验通过', 'ticket': ticket.to_json(), 'user': user.to_json()})
 
     @staticmethod
     async def ticket_checked(request):
@@ -376,18 +393,12 @@ class TicketHandles:
             '_id': data['ticket_id'],
         })
         if ticket_doc is None:
-            return web.json_response({'code': -1, 'message': '此券不存在'})
-        if ticket_doc['state'] == 'verified':
-            return web.json_response({'code': -1, 'message': '此券已被使用'})
-        if ticket_doc['state'] == 'expired':
-            return web.json_response({'code': -1, 'message': '此券已过期'})
+            return web.json_response({'code': -1, 'message': '票券不存在'})
         if ticket_doc['state'] != 'valid':
-            return web.json_response({'code': -1, 'message': '此券状态异常'})
+            return web.json_response({'code': -1, 'message': '票券状态异常'})
         date_now = datetime.now().strftime('%Y-%m-%d')
-        if ticket_doc['expiry_date'] < date_now:
-            return web.json_response({'code': -1, 'message': '此券已过期'})
-        if ticket_doc['expiry_date'] > date_now:
-            return web.json_response({'code': -1, 'message': '此券未生效'})
+        if ticket_doc['expiry_date'] != date_now:
+            return web.json_response({'code': -1, 'message': '票券日期不正确'})
 
         user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
         res = await db.ticket.update_one({
@@ -403,7 +414,7 @@ class TicketHandles:
             return web.json_response({'code': -2, 'message': '找不到对应的票券'})
         if res.modified_count == 0:
             return web.json_response({'code': -2, 'message': '更新票券信息失败'})
-        return web.json_response({'code': 0, 'message': '票券使用成功'})
+        return web.json_response({'code': 0, 'message': '票券检票成功'})
 
     @staticmethod
     async def ticket_generate(request):
