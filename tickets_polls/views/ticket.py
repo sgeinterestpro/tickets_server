@@ -10,7 +10,7 @@ from aiohttp import web
 from bson import ObjectId
 
 from model import Ticket, User
-from unit import date_week_start, date_week_end
+from unit import date_week_start, date_week_end, date_month_start
 
 
 class TicketRouter(web.View):
@@ -435,3 +435,37 @@ class TicketHandles:
         if len(res.inserted_ids) == 0:
             return web.json_response({'code': -3, 'message': '生成票券失败'})
         return web.json_response({'code': 0, 'message': '生成票券成功', 'data': data})
+
+    @staticmethod
+    async def ticket_usage(request):
+        db = request.app['db']
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        this_month_start = date_month_start().strftime('%Y-%m-%d')
+        this_date_now = datetime.now().strftime('%Y-%m-%d')
+        default_count = await db.ticket.count_documents({
+            'state': 'default',
+        })
+        valid_count = await db.ticket.count_documents({
+            'state': 'valid',
+            'expiry_date': {'$gte': this_month_start}
+        })
+        verified_count = await db.ticket.count_documents({
+            'state': 'verified',
+            'expiry_date': {'$gte': this_month_start}
+        })
+        expired_count = await db.ticket.count_documents({
+            'state': 'expired',
+            'expiry_date': {'$gte': this_month_start}
+        })
+        invalid_count = await db.ticket.count_documents({
+            'state': 'invalid',
+            'expiry_date': {'$gte': this_month_start}
+        })
+        return web.json_response({'code': 0, 'data': {
+            'default': default_count,
+            'active': valid_count + verified_count + expired_count + invalid_count,
+            'valid': valid_count,
+            'verified': verified_count,
+            'expired': expired_count,
+            'invalid': invalid_count
+        }})

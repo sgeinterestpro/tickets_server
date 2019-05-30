@@ -17,6 +17,7 @@ def setup_routes(app):
     app.router.add_route('*', '/ticket_inspect', TicketHandles.ticket_inspect)
     app.router.add_route('*', '/ticket_checked', TicketHandles.ticket_checked)
     app.router.add_route('*', '/ticket_generate', TicketHandles.ticket_generate)
+    app.router.add_route('*', '/ticket_usage', TicketHandles.ticket_usage)
 
 
 def setup_middleware(app):
