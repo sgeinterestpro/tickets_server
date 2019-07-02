@@ -293,11 +293,12 @@ class TicketHandles:
                 'expiry_date': data['date']
             }
         })
-
         if res.matched_count == 0:
             return web.json_response({'code': -1, 'message': '没有可领取的票券'})
         if res.modified_count == 0:
             return web.json_response({'code': -2, 'message': '更新票券信息失败'})
+        _ = await db.ticket_log.insert_one(
+            {'user_id': user.object_id, 'option': 'purchase', 'class': data['class'], 'expiry_date': data['date']})
         return web.json_response({'code': 0, 'message': '票券领取成功'})
 
     @staticmethod
@@ -332,6 +333,8 @@ class TicketHandles:
             return web.json_response({'code': -2, 'message': '找不到对应的票券'})
         if res.modified_count == 0:
             return web.json_response({'code': -2, 'message': '更新票券信息失败'})
+        _ = await db.ticket_log.insert_one(
+            {'user_id': user.object_id, 'option': 'refund', 'ticket_id': data['ticket_id']})
         return web.json_response({'code': 0, 'message': '票券删除成功'})
 
     @staticmethod
@@ -410,10 +413,13 @@ class TicketHandles:
                 'check_time': datetime.now()
             }
         })
+
         if res.matched_count == 0:
             return web.json_response({'code': -2, 'message': '找不到对应的票券'})
         if res.modified_count == 0:
             return web.json_response({'code': -2, 'message': '更新票券信息失败'})
+        _ = await db.ticket_log.insert_one(
+            {'user_id': user.object_id, 'option': 'checked', 'ticket_id': data['ticket_id']})
         return web.json_response({'code': 0, 'message': '票券检票成功'})
 
     @staticmethod
@@ -469,3 +475,26 @@ class TicketHandles:
             'expired': expired_count,
             'invalid': invalid_count
         }})
+
+    @staticmethod
+    async def ticket_log(request):
+        """
+        获取票券记录
+        :param request:
+        :return:
+        """
+        db = request.app['db']
+        cursor = db.ticket_log.find({}).limit(10)
+        data = {'count': 0, 'items': []}
+        # for ticket in await cursor.to_list(length=100):
+        async for ticket_doc in cursor:
+            # ticket = Ticket(**ticket_doc)
+            data['items'].append({
+                'option': ticket_doc.get('option', None),
+                'ticket_id': ticket_doc.get('ticket_id', None),
+                'class': ticket_doc.get('class', None),
+                'expiry_date': ticket_doc.get('expiry_date', None),
+            })
+            data['count'] += 1
+
+        return web.json_response(data)
