@@ -9,9 +9,9 @@ import logging
 from aiohttp import web
 
 from config import setup_config
-from database import setup_database
+from u_database import setup_database
 from routes import setup_routes, setup_middleware
-from task import setup_task
+from u_task import setup_task
 
 logging.basicConfig(format='%(asctime)s - %(pathname)s[line:%(lineno)d] - %(levelname)s: %(message)s',
                     level=logging.INFO)
