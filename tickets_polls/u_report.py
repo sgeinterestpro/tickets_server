@@ -16,7 +16,6 @@
 import logging
 from io import BytesIO
 
-# import xlwt
 import openpyxl
 from openpyxl.styles import Border, Side, Alignment
 from openpyxl.utils import get_column_letter
@@ -62,41 +61,62 @@ class ReportCheckLogFlow(ReportBase):
     def _mail_msg(self):
         return '您好：请在这里<a class="follow-nickName" href="https://me.csdn.net/offbeatmine" target="_blank">下载报表</a>'
 
+    def style_body(self, cell):
+        cell.alignment = self.align
+        cell.border = self.border
+
+    def style_title(self, cell):
+        cell.alignment = self.align
+
     async def get_attachs(self):
         # 创建一个文件对象
         wb = openpyxl.Workbook()
         # 创建一个sheet对象
-        sheet = wb.create_sheet('Sheet1')
+        sheet = wb.active
         # 写入文件标题
         for index, (head, width) in enumerate([
-            ('序号', 6),
+            ('序号', 4.63),
             ('项目', 8),
-            ('票券编号', 10),
-            ('领取时间', 10),
+            ('票券编号', 23.25),
+            ('领取时间', 21),
             ('领取人员', 10),
-            ('使用时间', 10),
+            ('使用时间', 21),
             ('检票人员', 10)
         ]):
             sheet.column_dimensions[get_column_letter(index + 1)].width = width
-            cell = sheet.cell(2, index, head)
-            cell.alignment = self.align
-            cell.border = self.border
+            self.style_body(sheet.cell(3, index + 1, head))
 
-        sheet.cell(0, 4, self._email_subject).alignment = self.align
-        # sheet.cell(1, 4, '2019年07月').alignment = self.align
+        self.style_title(sheet.cell(1, 4, self._email_subject))
+        # sheet.cell(2, 5, '2019年07月').alignment = self.align
         # cursor = self.db.ticket_log.find({"time": {"$gte": datetime(2016, 9, 26), "$lt": datetime(2016, 9, 27)}})
-        cursor = self.db.ticket.find()
-        index = 3
-        async for ticket_log_doc in cursor:
-            cell = sheet.cell(index, 4, ticket_log_doc['_id'])
-            cell.alignment = self.align
-            cell.border = self.border
+        cursor = self.db.ticket_log.find({})
+        index = 0
+        async for ticket_log in cursor:
+            if 'checked' != ticket_log['option']:
+                continue
+            ticket_doc = await self.db.ticket.find_one({
+                '_id': ticket_log['ticket_id'],
+            })
+            purchaser = await self.db.user.find_one({
+                '_id': ticket_doc['purchaser'],
+            })
+            checker = await self.db.user.find_one({
+                '_id': ticket_doc['checker'],
+            })
+            self.style_body(sheet.cell(index + 4, 1, index + 1))  # 序号
+            self.style_body(sheet.cell(index + 4, 2, ticket_doc['class']))  # 项目
+            self.style_body(sheet.cell(index + 4, 3, ticket_doc['_id']))  # 票券编号
+            self.style_body(sheet.cell(index + 4, 4, ticket_doc['purch_time']))  # 领取时间
+            self.style_body(sheet.cell(index + 4, 5, purchaser['wx_open_id']))  # 领取人员
+            self.style_body(sheet.cell(index + 4, 6, ticket_doc['check_time']))  # 使用时间
+            self.style_body(sheet.cell(index + 4, 7, checker['wx_open_id']))  # 检票人员
             index += 1
+
         # 写出到IO
         output = BytesIO()
         wb.save(output)
 
-        return f'{self._email_subject}.xls', output
+        return f'{self._email_subject}.xlsx', output
 
 
 if __name__ == '__main__':
@@ -107,8 +127,24 @@ if __name__ == '__main__':
         level=logging.NOTSET,
         stream=stdout)
 
+    from urllib.parse import quote_plus
+    import asyncio
+    from motor.motor_asyncio import AsyncIOMotorClient
     from u_email import EmailSender
 
+    uri = 'mongodb://'
+    uri += '{}:{}'.format(quote_plus('127.0.0.1'), quote_plus('27017'))
+    client = AsyncIOMotorClient(uri)
+
+    ReportBase.db = client.get_database('ticket')
     ReportBase.sender = EmailSender
-    # with open('test.xls', 'wb') as xls:
-    #     xls.write(ReportA()._attachs[1].getvalue())
+
+
+    async def test():
+        with open('活动券使用记录流水表.xlsx', 'wb') as xls:
+            attachs = await ReportCheckLogFlow().get_attachs()
+            xls.write(attachs[1].getvalue())
+
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(test())

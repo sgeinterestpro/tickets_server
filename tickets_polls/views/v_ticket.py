@@ -371,9 +371,9 @@ class TicketHandles:
         if ticket['state'] != 'valid':
             return web.json_response({'code': -1, 'message': '票券状态异常'})
         date_now = datetime.now().strftime('%Y-%m-%d')
-        if ticket['state'] < date_now:
+        if ticket['expiry_date'] < date_now:
             return web.json_response({'code': -1, 'message': '票券已过期'})
-        if ticket['state'] > date_now:
+        if ticket['expiry_date'] > date_now:
             return web.json_response({'code': -1, 'message': '票券未生效'})
 
         user_doc = await db.user.find_one({
