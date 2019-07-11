@@ -34,4 +34,4 @@
 #                   '$               $
 #                    $               $
 
-from .auth import *
+from .m_auth import *

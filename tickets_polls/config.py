@@ -17,5 +17,5 @@ def load_config(config_path):
 
 
 def setup_config(app):
-    conf = load_config(str(pathlib.Path('.') / 'config' / 'polls.yaml'))
+    conf = load_config(str(pathlib.Path('..') / 'config' / 'polls.yaml'))
     app['config'] = conf

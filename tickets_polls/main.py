@@ -9,18 +9,27 @@ import logging
 from aiohttp import web
 
 from config import setup_config
-from database import setup_database
 from routes import setup_routes, setup_middleware
-from task import setup_task
+from u_database import setup_database
+from u_email import setup_email
+from u_report import setup_report
+from u_task import setup_task
 
-logging.basicConfig(format='%(asctime)s - %(pathname)s[line:%(lineno)d] - %(levelname)s: %(message)s',
-                    level=logging.INFO)
+logging.basicConfig(
+    format='%(levelname)s: %(asctime)s [%(pathname)s:%(lineno)d] %(message)s',
+    level=logging.NOTSET
+)
 
 app = web.Application()
 setup_config(app)
 setup_routes(app)
 setup_middleware(app)
+
 setup_database(app)
-setup_task(app)  # 需要在数据库设置完成后设置
+setup_task(app)  # 依赖 database
+
+setup_email(app)
+setup_report(app)  # 依赖 email, database
+
 host, port = app['config']['server']['host'], int(app['config']['server']['port'])
 web.run_app(app, host=host, port=port)
