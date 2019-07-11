@@ -94,22 +94,19 @@ class ReportCheckLogFlow(ReportBase):
         async for ticket_log in cursor:
             if 'checked' != ticket_log['option']:
                 continue
-            ticket_doc = await self.db.ticket.find_one({
-                '_id': ticket_log['ticket_id'],
-            })
-            purchaser = await self.db.user.find_one({
-                '_id': ticket_doc['purchaser'],
-            })
-            checker = await self.db.user.find_one({
-                '_id': ticket_doc['checker'],
-            })
+
+            ticket_doc = await self.db.ticket.find_one({'_id': ticket_log['ticket_id'], })
+            purchaser = await self.db.user.find_one({'_id': ticket_doc['purchaser'], })
+            checker = await self.db.user.find_one({'_id': ticket_doc['checker'], })
+
             self.style_body(sheet.cell(index + 4, 1, index + 1))  # 序号
             self.style_body(sheet.cell(index + 4, 2, ticket_doc['class']))  # 项目
             self.style_body(sheet.cell(index + 4, 3, ticket_doc['_id']))  # 票券编号
             self.style_body(sheet.cell(index + 4, 4, ticket_doc['purch_time']))  # 领取时间
-            self.style_body(sheet.cell(index + 4, 5, purchaser['wx_open_id']))  # 领取人员
+            self.style_body(sheet.cell(index + 4, 5, purchaser['realName']))  # 领取人员
             self.style_body(sheet.cell(index + 4, 6, ticket_doc['check_time']))  # 使用时间
-            self.style_body(sheet.cell(index + 4, 7, checker['wx_open_id']))  # 检票人员
+            self.style_body(sheet.cell(index + 4, 7, checker['realName']))  # 检票人员
+
             index += 1
 
         # 写出到IO
