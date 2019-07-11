@@ -282,23 +282,26 @@ class TicketHandles:
         # ticket = Ticket(**data)
         # ticket.user_id = user.object_id
         # res = await db.ticket.insert_one(ticket.to_object())
+        new_value = {
+            'class': data['class'],
+            'state': 'valid',
+            'purchaser': user.object_id,
+            'purch_time': datetime.now(),
+            'expiry_date': data['date']
+        }
         res = await db.ticket.update_one({
             'state': 'default'
         }, {
-            '$set': {
-                'class': data['class'],
-                'state': 'valid',
-                'purchaser': user.object_id,
-                'purch_time': datetime.now(),
-                'expiry_date': data['date']
-            }
+            '$set': new_value
         })
         if res.matched_count == 0:
             return web.json_response({'code': -1, 'message': '没有可领取的票券'})
         if res.modified_count == 0:
             return web.json_response({'code': -2, 'message': '更新票券信息失败'})
+        new_ticket_data = await db.ticket.find_one(new_value)
+        new_ticket = Ticket(**new_ticket_data)
         _ = await db.ticket_log.insert_one(
-            {'user_id': user.object_id, 'option': 'purchase', 'class': data['class'], 'expiry_date': data['date']})
+            {'user_id': user.object_id, 'option': 'purchase', 'ticket_id': new_ticket.json_id})
         return web.json_response({'code': 0, 'message': '票券领取成功'})
 
     @staticmethod
@@ -484,16 +487,50 @@ class TicketHandles:
         :return:
         """
         db = request.app['db']
-        cursor = db.ticket_log.find({}).limit(10)
+        match = {'$match': {'ticket_id': {'$ne': None}}}
+        # limit = {'$limit': 5}
+        sort = {'$sort': {'time': 1}}
+        lookup_ticket = {
+            '$lookup': {
+                'from': 'ticket',
+                'localField': 'ticket_id',
+                'foreignField': '_id',
+                'as': 'tickets'
+            }
+        }
+        lookup_user = {
+            '$lookup': {
+                'from': 'user',
+                'localField': 'user_id',
+                'foreignField': '_id',
+                'as': 'users'
+            }
+        }
+        add_fields = {
+            '$addFields': {
+                'ticket': {'$arrayElemAt': ['$tickets', 0]},
+                'user': {'$arrayElemAt': ['$users', 0]}
+            }
+        }
+        project = {'$project': {'tickets': 0, 'users': 0}}
+        pipeline = [
+            match,
+            # limit,
+            sort,
+            lookup_ticket,
+            lookup_user,
+            add_fields,
+            project
+        ]
+        cursor = db.ticket_log.aggregate(pipeline)
         data = {'count': 0, 'items': []}
-        # for ticket in await cursor.to_list(length=100):
         async for ticket_doc in cursor:
-            # ticket = Ticket(**ticket_doc)
             data['items'].append({
                 'option': ticket_doc.get('option', None),
+                'time': str(ticket_doc.get('_id', None).generation_time.astimezone()),
                 'ticket_id': ticket_doc.get('ticket_id', None),
-                'class': ticket_doc.get('class', None),
-                'expiry_date': ticket_doc.get('expiry_date', None),
+                'ticket_class': ticket_doc['ticket'].get('class', None),
+                'user_wx_open_id': ticket_doc['user'].get('wx_open_id', None),
             })
             data['count'] += 1
 
