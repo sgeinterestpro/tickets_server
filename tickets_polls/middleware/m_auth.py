@@ -10,8 +10,9 @@ from aiohttp.web_middlewares import middleware
 
 @middleware
 async def auth_middleware(request, handler):
-    if request.headers.get('open-id') is None:
-        return HTTPForbidden()
-    request['open-id'] = request.headers.get('open-id')
+    if request.rel_url.parts[1] != 'web':
+        if not request.headers.get('open-id'):
+            return HTTPForbidden()
+        request['open-id'] = request.headers.get('open-id')
     resp = await handler(request)
     return resp
