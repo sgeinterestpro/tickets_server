@@ -37,15 +37,16 @@ class EmailSender:
                 attachs = [attachs]
 
             for attach_name, attach_io in attachs:
-                att_tmp = MIMEText(attach_io.getvalue(), 'base64', 'utf-8')
-                att_tmp['Content-Type'] = 'application/octet-stream'
-                att_tmp['Content-Disposition'] = f'attachment; filename="{attach_name}"'
-                message.attach(att_tmp)
+                attachment = MIMEText(attach_io.getvalue(), 'base64', 'gbk')
+                attachment['Content-Type'] = Header('application/octet-stream')
+                # att_tmp['Content-Disposition'] = f'attachment; filename="{attach_name}"' # 英文文件名可以这么用
+                attachment.add_header('Content-Disposition', 'attachment', filename=('gbk', '', attach_name))
+                message.attach(attachment)
 
-        message.add_header('X-Mailer', 'Microsoft Outlook Express 6.00.2900.2869')
+        message['X-Mailer'] = Header('Microsoft Outlook Express 6.00.2900.2869')
         message['From'] = Header(from_addr)
         message['To'] = Header(','.join(to_addrs))
-        message['Subject'] = Header(subject, 'gbk')
+        message['Subject'] = Header(subject, charset='gbk')
 
         try:
             with SmtpServer(mail_host, 25) as smtp_server:
@@ -80,7 +81,7 @@ if __name__ == '__main__':
     from io import BytesIO
 
     # 创建一个文件对象
-    wb = xlwt.Workbook(encoding='utf8')
+    wb = xlwt.Workbook(encoding='utf-8')
     # 创建一个sheet对象
     sheet = wb.add_sheet('order-sheet')
 
