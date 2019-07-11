@@ -1,4 +1,4 @@
-xlwt
+openpyxl==2.6.2
 aiohttp==3.5.4
 APScheduler==3.6.0
 motor==2.0.0
