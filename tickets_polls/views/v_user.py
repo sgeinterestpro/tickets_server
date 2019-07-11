@@ -27,14 +27,17 @@ class UserHandles:
     @staticmethod
     async def user_info(request):
         db = request.app['db']
-        # user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
-        data = await request.json()
-        _ = await db.user.update_one({
-            'wx_open_id': request['open-id']
-        }, {
-            '$set': data['userInfo']
-        })
-        return web.json_response({'code': 0, 'message': '用户信息更新成功'})
+        if request.method == 'POST':
+            data = await request.json()
+            _ = await db.user.update_one({
+                'wx_open_id': request['open-id']
+            }, {
+                '$set': data['userInfo']
+            })
+            return web.json_response({'code': 0, 'message': '用户信息更新成功'})
+        elif request.method == 'GET':
+            user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+            return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user.to_json()})
 
     @staticmethod
     async def user_bind(request):
