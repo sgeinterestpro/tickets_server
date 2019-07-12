@@ -59,7 +59,9 @@ class ReportCheckLogFlow(ReportBase):
 
     @property
     def _mail_msg(self):
-        return '您好：请在这里<a class="follow-nickName" href="https://me.csdn.net/offbeatmine" target="_blank">下载报表</a>'
+        return f'''
+        您好：请在这里<a class="follow-nickName" href="https://me.csdn.net/offbeatmine" target="_blank">下载报表</a>
+        '''
 
     def style_body(self, cell):
         cell.alignment = self.align
