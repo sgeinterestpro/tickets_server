@@ -9,6 +9,7 @@ from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+mail_charset = 'utf-8'
 mail_host = b'\x73\x6d\x74\x70\x2e\x73\x69\x6e\x61\x2e\x63\x6f\x6d'.decode()
 mail_user = b'\x73\x67\x65\x5f\x6e\x6f\x74\x69\x66\x79\x40\x73\x69\x6e\x61\x2e\x63\x6f\x6d'.decode()
 mail_pass = b'\x53\x67\x65\x32\x30\x30\x32\x31\x30\x33\x30'.decode()
@@ -20,33 +21,34 @@ def setup_email(app):
 
 class EmailSender:
     @staticmethod
-    def send(to_addrs, subject, mail_msg, attachs):
+    def send(to_addrs, subject, mail_msg, attachs=None):
         logging.debug((to_addrs, subject, mail_msg, attachs))
         from_addr = mail_user
         if isinstance(to_addrs, str):
             to_addrs = [to_addrs]
 
         if attachs is None:
-            message = MIMEText(mail_msg, _subtype='html', _charset='gbk')
+            message = MIMEText(mail_msg, _subtype='html', _charset=mail_charset)
         else:
             message = MIMEMultipart()
-            msg_text = MIMEText(mail_msg, _subtype='html', _charset='gbk')
+            msg_text = MIMEText(mail_msg, _subtype='html', _charset=mail_charset)
             message.attach(msg_text)
 
             if isinstance(attachs, tuple):
                 attachs = [attachs]
 
             for attach_name, attach_io in attachs:
-                attachment = MIMEText(attach_io.getvalue(), 'base64', 'gbk')
+                attachment = MIMEText(attach_io.getvalue(), 'base64', mail_charset)
                 attachment['Content-Type'] = Header('application/octet-stream')
-                # att_tmp['Content-Disposition'] = f'attachment; filename="{attach_name}"' # 英文文件名可以这么用
-                attachment.add_header('Content-Disposition', 'attachment', filename=('gbk', '', attach_name))
+                # att_tmp['Content-Disposition'] = f'attachment; filename="{attach_name}"' # 纯英文可用
+                attachment.add_header('Content-Disposition', 'attachment', filename=(mail_charset, '', attach_name))
                 message.attach(attachment)
 
-        message['X-Mailer'] = Header('Microsoft Outlook Express 6.00.2900.2869')
-        message['From'] = Header(from_addr)
-        message['To'] = Header(','.join(to_addrs))
-        message['Subject'] = Header(subject, charset='gbk')
+        message['X-Mailer'] = 'Microsoft Outlook Express 6.00.2900.2869'
+        # message['Subject'] = subject # 纯英文可用
+        message['Subject'] = Header(subject, charset=mail_charset).encode()
+        message['From'] = from_addr
+        message['To'] = ';'.join(to_addrs)
 
         try:
             with SmtpServer(mail_host, 25) as smtp_server:
@@ -54,6 +56,7 @@ class EmailSender:
                 logging.debug('邮件发送成功')
         except Exception as e:
             logging.exception(e)
+            raise e
 
 
 class SmtpServer:

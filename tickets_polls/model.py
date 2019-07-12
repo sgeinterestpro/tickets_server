@@ -90,7 +90,17 @@ class Ticket(Model):
 
 
 class User(Model):
-    fled_list = ['wx_open_id']
+    fled_list = [
+        'wx_open_id',
+        'avatarUrl',
+        'city',
+        'country',
+        'gender',
+        'language',
+        'nickName',
+        'province',
+        'init_id'
+    ]
     fled_default = {}
 
     @staticmethod
