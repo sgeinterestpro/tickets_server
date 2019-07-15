@@ -18,9 +18,14 @@ def setup_routes(app):
     app.router.add_route('*', '/ticket_checked', TicketHandles.ticket_checked)
     app.router.add_route('*', '/ticket_generate', TicketHandles.ticket_generate)
     app.router.add_route('*', '/ticket_usage', TicketHandles.ticket_usage)
+
     app.router.add_route('*', '/ticket_log', TicketHandles.ticket_log)
+    app.router.add_route('*', '/ticket_check_log', TicketHandles.ticket_check_log)
+
     app.router.add_route('*', '/user_info', UserHandles.user_info)
+    app.router.add_route('*', '/user_info_update', UserHandles.user_info_update)
     app.router.add_route('*', '/user_bind', UserHandles.user_bind)
+    app.router.add_route('*', '/user_list', UserHandles.user_list)
 
     app.router.add_route('*', '/web/email_check/{uuid}', WebHandles.email_check, name='email-check')
 

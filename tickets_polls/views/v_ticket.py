@@ -4,7 +4,7 @@ datetime: 2019-04-22
 author: muumlover
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from aiohttp import web
 from bson import ObjectId
@@ -390,6 +390,27 @@ class TicketHandles:
                 'ticket_class': ticket_log_doc.get('ticket', {}).get('class', None),
                 'real_name': ticket_log_doc.get('init', {}).get('real_name', None),
             })
+            data['count'] += 1
+
+        return web.json_response(data)
+
+    @staticmethod
+    async def ticket_check_log(request):
+        db = request.app['db']
+        # user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        data = await request.json()
+        date = data.get('date', datetime.now().strftime('%Y-%m-%d'))
+        date_start = datetime.strptime(date, '%Y-%m-%d')
+        date_end = datetime.strptime(date, '%Y-%m-%d') + timedelta(days=1)
+        cursor = db.ticket.find({
+            'check_time': {'$gte': date_start, '$lte': date_end}
+        })
+
+        data = {'count': 0, 'items': []}
+        # for ticket in await cursor.to_list(length=100):
+        async for ticket_doc in cursor:
+            ticket = Ticket(**ticket_doc)
+            data['items'].append(ticket.to_json())
             data['count'] += 1
 
         return web.json_response(data)

@@ -18,7 +18,7 @@ from datetime import datetime
 
 from aiohttp import web
 
-from model import User
+from model import User, UserInit
 from u_email import EmailSender
 
 
@@ -27,23 +27,25 @@ class UserHandles:
     @staticmethod
     async def user_info(request):
         db = request.app['db']
-        if request.method == 'POST':
-            data = await request.json()
-            _ = await db.user.update_one({
-                'wx_open_id': request['open-id']
-            }, {
-                '$set': data['userInfo']
-            })
-            return web.json_response({'code': 0, 'message': '用户信息更新成功'})
-        elif request.method == 'GET':
-            user_info = {}
-            user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
-            user_init = await db.user_init.find_one({'_id': user['init_id']})
-            if user_init is not None:
-                user_init.pop('_id')
-                user_info.update(user_init)
-            user_info.update(user.to_json())
-            return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user_info})
+        user_info = {}
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user_init = await db.user_init.find_one({'_id': user['init_id']})
+        if user_init is not None:
+            user_init.pop('_id')
+            user_info.update(user_init)
+        user_info.update(user.to_json())
+        return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user_info})
+
+    @staticmethod
+    async def user_info_update(request):
+        db = request.app['db']
+        data = await request.json()
+        _ = await db.user.update_one({
+            'wx_open_id': request['open-id']
+        }, {
+            '$set': data['userInfo']
+        })
+        return web.json_response({'code': 0, 'message': '用户信息更新成功'})
 
     @staticmethod
     async def user_bind(request):
@@ -84,3 +86,22 @@ class UserHandles:
             return web.json_response({'code': 0, 'message': '邮件发送成功'})
         except Exception:
             return web.json_response({'code': -1, 'message': '邮件服务器繁忙'})
+
+    @staticmethod
+    async def user_list(request):
+        db = request.app['db']
+        cursor = db.user_init.find()
+
+        data = {'count': 0, 'items': []}
+        # for ticket in await cursor.to_list(length=100):
+        async for user_init_doc in cursor:
+            user_init = UserInit(**user_init_doc)
+            item = user_init.to_json()
+            item.pop('_id')
+            user = await User.find_one(db, {'init_id': user_init.object_id})
+            if user is not None:
+                item.update(user.to_json())
+            data['items'].append(item)
+            data['count'] += 1
+
+        return web.json_response(data)

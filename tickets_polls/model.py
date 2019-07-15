@@ -3,7 +3,6 @@ filename: model.py
 datetime: 2019-04-25
 author: muumlover
 """
-
 from datetime import datetime
 
 from bson import ObjectId
@@ -14,8 +13,13 @@ class Model:
     数据对象
     """
     _id = None
+    collection_name = None
     fled_list = []
     fled_default = {}
+
+    def __new__(cls, *args, **kwargs):
+        if kwargs:
+            return super().__new__(cls, *args)
 
     def __init__(self, **kwargs) -> None:
         if '_id' in kwargs:
@@ -50,6 +54,11 @@ class Model:
     #         return None
     #     return self._id.generation_time.astimezone()
 
+    @classmethod
+    async def find_one(cls, db, data):
+        doc = await db[cls.collection_name].find_one(data)
+        return cls(**(doc or {}))
+
     def to_object(self, include_id=False):
         json = {}
         if include_id:
@@ -73,6 +82,8 @@ class Model:
 
 
 class Ticket(Model):
+    collection_name = 'ticket'
+
     fled_list = ['class', 'state', 'raiser', 'raise_time', 'purchaser', 'purch_time', 'expiry_date', 'overdue_time',
                  'checker', 'check_time']
     fled_default = {
@@ -90,6 +101,8 @@ class Ticket(Model):
 
 
 class User(Model):
+    collection_name = 'user'
+
     fled_list = [
         'wx_open_id',
         'avatarUrl',
@@ -115,3 +128,16 @@ class User(Model):
         else:
             user = User(**user_mongo)
         return user
+
+
+class UserInit(Model):
+    collection_name = 'user_init'
+
+    fled_list = [
+        'email',
+        'real_name',
+        'phone',
+        'work_no',
+        'role'
+    ]
+    fled_default = {}
