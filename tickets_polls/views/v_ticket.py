@@ -3,7 +3,7 @@ filename: v_ticket.py
 datetime: 2019-04-22
 author: muumlover
 """
-import time
+import uuid
 from datetime import datetime
 
 from aiohttp import web
@@ -225,14 +225,11 @@ class TicketHandles:
         data = await request.json()
         if 'count' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
-        ticket_id_base = 'SGE{time}{rnd}%05d'.format(
-            time=datetime.now().strftime('%Y%m%d'),
-            rnd=str(int(time.time()) % 86400).zfill(5)
-        )
+        ticket_id_base = 'SGE_{time}%s'.format(time=datetime.now().strftime('%Y%m%d'))
         raise_time = datetime.now()
-        new_ticket_list = [Ticket(_id=ticket_id_base % index,
+        new_ticket_list = [Ticket(_id=ticket_id_base % (uuid.uuid1().hex.upper()),
                                   raiser=user.object_id,
-                                  raise_time=raise_time).to_object(True) for index in range(data['count'])]
+                                  raise_time=raise_time).to_object(True) for _ in range(data['count'])]
         res = await db.ticket.insert_many(new_ticket_list)
         if len(res.inserted_ids) == 0:
             return web.json_response({'code': -3, 'message': '生成票券失败'})
@@ -280,9 +277,15 @@ class TicketHandles:
         :return:
         """
         db = request.app['db']
+        data = await request.json()
+        skip_count = data.get('skip', 0)
+        limit_count = data.get('limit', 5)
         match = {'$match': {'ticket_id': {'$ne': None}}}
-        # limit = {'$limit': 5}
-        sort = {'$sort': {'time': 1}}
+        # 按时间排序记录
+        sort = {'$sort': {'_id': -1}}
+        skip = {'$skip': skip_count}
+        limit = {'$limit': limit_count}
+        # 联合查询票券信息表
         lookup_ticket = {
             '$lookup': {
                 'from': 'ticket',
@@ -291,6 +294,7 @@ class TicketHandles:
                 'as': 'tickets'
             }
         }
+        # 联合查询用户信息表
         lookup_user = {
             '$lookup': {
                 'from': 'user',
@@ -299,31 +303,92 @@ class TicketHandles:
                 'as': 'users'
             }
         }
+        # 转换查询结果列表为数据对象
         add_fields = {
             '$addFields': {
                 'ticket': {'$arrayElemAt': ['$tickets', 0]},
                 'user': {'$arrayElemAt': ['$users', 0]}
             }
         }
-        project = {'$project': {'tickets': 0, 'users': 0}}
+        # 联合查询用户工作信息表
+        lookup_real = {
+            '$lookup': {
+                'from': 'user_init',
+                'localField': 'user.init_id',
+                'foreignField': '_id',
+                'as': 'inits'
+            }
+        }
+        # 转换查询结果列表为数据对象
+        add_field_real = {
+            '$addFields': {
+                'init': {'$arrayElemAt': ['$inits', 0]}
+            }
+        }
+        # 删除查询结果
+        project = {'$project': {'tickets': 0, 'users': 0, 'inits': 0}}
         pipeline = [
             match,
-            # limit,
             sort,
+            skip,
+            limit,
             lookup_ticket,
             lookup_user,
             add_fields,
+            lookup_real,
+            add_field_real,
             project
         ]
         cursor = db.ticket_log.aggregate(pipeline)
         data = {'count': 0, 'items': []}
-        async for ticket_doc in cursor:
+        async for ticket_log_doc in cursor:
+            '''目标数据格式
+            {
+                '_id': ObjectId('5d26e9e17e2fec35dd45fef6'),
+                'user_id': ObjectId('5d25eee4f2a471d041f759b7'), 
+                'option': 'purchase',
+                'ticket_id': 'SGE201907105029500002',
+                'ticket': {
+                    '_id': 'SGE201907105029500002',
+                    'class': 'basketball',
+                    'state': 'expired',
+                    'raiser': ObjectId('5d25eee4f2a471d041f759b7'),
+                    'raise_time': datetime.datetime(2019, 7, 10, 21, 58, 15, 487000),
+                    'purchaser': ObjectId('5d28638806e6e6b2a86bc85e'),
+                    'purch_time': datetime.datetime(2019, 7, 13, 17, 4, 36, 78000),
+                    'expiry_date': '2019-07-13',
+                    'overdue_time': datetime.datetime(2019, 7, 14, 0, 0, 0, 7000), 
+                    'checker': None,
+                    'check_time': None
+                }, 
+                'user': {
+                    '_id': ObjectId('5d25eee4f2a471d041f759b7'),
+                    'wx_open_id': 'oZ2qW1Asmsq5MW__8yuK-IEueGIY',
+                    'avatarUrl': 'https://wx.qlogo.cn/mmopen/vi_32/DYAIOgq15epMZYIBY5flW0YiaF2d57xx0a2fhyKtSKmyQZfBVsVvE1WWibu22PRyofvHAHJOXiavNBdSkQtibWK4ow/132',
+                    'city': '',
+                    'country': '',
+                    'gender': 1,
+                    'language': 'zh_CN', 
+                    'nickName': '张三丰³',
+                    'province': '',
+                    'init_id': ObjectId('5d281c90e8834258726aa12c')
+                },
+                'init': {
+                    '_id': ObjectId('5d281c90e8834258726aa12c'), 
+                    'email': 'zhangsan@qq.com',
+                    'real_name': '张三', 
+                    'phone': '13300330333', 
+                    'work_no': '5433',
+                    'role': ['user', 'admin', 'checker']
+                }
+            }
+            '''
             data['items'].append({
-                'option': ticket_doc.get('option', None),
-                'time': str(ticket_doc.get('_id', None).generation_time.astimezone()),
-                'ticket_id': ticket_doc.get('ticket_id', None),
-                'ticket_class': ticket_doc['ticket'].get('class', None),
-                'user_wx_open_id': ticket_doc['user'].get('wx_open_id', None),
+                'option': ticket_log_doc.get('option', None),
+                'time': str(ticket_log_doc.get('_id', None).generation_time.astimezone()),
+                'ticket_id': ticket_log_doc.get('ticket_id', None),
+                'ticket_class': ticket_log_doc.get('ticket', {}).get('class', None),
+                'real_name': ticket_log_doc.get('init', {}).get('real_name', None),
             })
             data['count'] += 1
 
