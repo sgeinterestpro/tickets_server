@@ -9,14 +9,28 @@ from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-mail_charset = 'utf-8'
-mail_host = b'\x73\x6d\x74\x70\x2e\x73\x69\x6e\x61\x2e\x63\x6f\x6d'.decode()
-mail_user = b'\x73\x67\x65\x5f\x6e\x6f\x74\x69\x66\x79\x40\x73\x69\x6e\x61\x2e\x63\x6f\x6d'.decode()
-mail_pass = b'\x53\x67\x65\x32\x30\x30\x32\x31\x30\x33\x30'.decode()
+mail_charset = None
+mail_host = None
+mail_user = None
+mail_pass = None
 
 
 def setup_email(app):
     app['email'] = EmailSender
+
+    conf = app['config']
+
+    global mail_charset
+    mail_charset = conf['email']['charset']
+
+    global mail_host
+    mail_host = conf['email']['host']
+
+    global mail_user
+    mail_user = conf['email']['user']
+
+    global mail_pass
+    mail_pass = conf['email']['pass']
 
 
 class EmailSender:
@@ -83,6 +97,15 @@ if __name__ == '__main__':
         format='%(levelname)s: %(asctime)s [%(filename)s:%(lineno)d] %(message)s',
         level=logging.NOTSET,
         stream=stdout)
+
+    import pathlib
+    from config import load_config
+
+    conf = load_config(str(pathlib.Path('..') / 'config' / 'polls.yaml'))
+    mail_charset = conf['email']['charset']
+    mail_host = conf['email']['host']
+    mail_user = conf['email']['user']
+    mail_pass = conf['email']['pass']
 
     import xlwt
     from io import BytesIO

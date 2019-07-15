@@ -7,3 +7,13 @@ database:
   name: ticket
   user:
   pass:
+email:
+  charset: 'utf-8'
+  # sina
+  # host = smtp.sina.com
+  # user = sge_notify@sina.com
+  # pass = Sge20021030
+  # 163
+  host: smtp.163.com
+  user: sge_notify@163.com
+  pass: Sge2002
