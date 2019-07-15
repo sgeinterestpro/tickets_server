@@ -52,8 +52,12 @@ class EmailSender:
 
         try:
             with SmtpServer(mail_host, 25) as smtp_server:
-                smtp_server.sendmail(from_addr, to_addrs, message.as_string())
-                logging.debug('邮件发送成功')
+                send_errs = smtp_server.sendmail(from_addr, to_addrs, message.as_string())
+                if not send_errs:
+                    logging.debug('邮件发送成功')
+                else:
+                    logging.error('邮件发送失败')
+                    logging.error(send_errs)
         except Exception as e:
             logging.exception(e)
             raise e
