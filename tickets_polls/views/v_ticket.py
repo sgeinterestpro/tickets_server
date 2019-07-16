@@ -89,7 +89,7 @@ class TicketHandles:
         if res.matched_count == 0:
             return web.json_response({'code': -1, 'message': '没有可领取的票券'})
         if res.modified_count == 0:
-            return web.json_response({'code': -2, 'message': '更新票券信息失败'})
+            return web.json_response({'code': -3, 'message': '更新票券信息失败'})
         new_ticket_data = await db.ticket.find_one(new_value)
         new_ticket = Ticket(**new_ticket_data)
         _ = await db.ticket_log.insert_one(
@@ -125,9 +125,9 @@ class TicketHandles:
         })
 
         if res.matched_count == 0:
-            return web.json_response({'code': -2, 'message': '找不到对应的票券'})
+            return web.json_response({'code': -3, 'message': '找不到对应的票券'})
         if res.modified_count == 0:
-            return web.json_response({'code': -2, 'message': '更新票券信息失败'})
+            return web.json_response({'code': -3, 'message': '更新票券信息失败'})
         _ = await db.ticket_log.insert_one(
             {'user_id': user.object_id, 'option': 'refund', 'ticket_id': data['ticket_id']})
         return web.json_response({'code': 0, 'message': '票券删除成功'})
@@ -210,9 +210,9 @@ class TicketHandles:
         })
 
         if res.matched_count == 0:
-            return web.json_response({'code': -2, 'message': '找不到对应的票券'})
+            return web.json_response({'code': -3, 'message': '找不到对应的票券'})
         if res.modified_count == 0:
-            return web.json_response({'code': -2, 'message': '更新票券信息失败'})
+            return web.json_response({'code': -3, 'message': '更新票券信息失败'})
         _ = await db.ticket_log.insert_one(
             {'user_id': user.object_id, 'option': 'checked', 'ticket_id': data['ticket_id']})
         return web.json_response({'code': 0, 'message': '票券检票成功'})
