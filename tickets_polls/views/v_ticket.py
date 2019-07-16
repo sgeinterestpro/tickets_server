@@ -30,10 +30,13 @@ class TicketHandles:
             'expiry_date': {'$gte': this_week_start, '$lte': this_week_end}
         })
 
+        date_now = datetime.now().strftime('%Y-%m-%d')
         count, items = 0, []
         # for ticket in await cursor.to_list(length=100):
         async for ticket_doc in cursor:
             ticket = Ticket(**ticket_doc)
+            if ticket['state'] == 'valid' and date_now > ticket['expiry_date']:
+                ticket['state'] = 'expired'
             items.append(ticket.to_json())
             count += 1
 
@@ -113,6 +116,9 @@ class TicketHandles:
 
         if user.mongo_id != ticket['purchaser']:
             return web.json_response({'code': -1, 'message': '无法删除他人的票券'})
+
+        if ticket['state'] != 'valid':
+            return web.json_response({'code': -1, 'message': '无法删除此状态的票券'})
 
         date_now = datetime.now().strftime('%Y-%m-%d')
         if date_now > ticket['expiry_date']:
@@ -405,9 +411,14 @@ class TicketHandles:
         db = request.app['db']
         # user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
         data = await request.json()
-        date = data.get('date', datetime.now().strftime('%Y-%m-%d'))
-        date_start = datetime.strptime(date, '%Y-%m-%d')
-        date_end = datetime.strptime(date, '%Y-%m-%d') + timedelta(days=1)
+        start = data.get('start', datetime.now().strftime('%Y-%m-%d'))
+        end = data.get('end', start)
+        try:
+            date_start = datetime.strptime(start, '%Y-%m-%d')
+            date_end = datetime.strptime(end, '%Y-%m-%d') + timedelta(days=1)
+        except ValueError:
+            return web.json_response({'code': -2, 'message': '日期输入错误'})
+
         cursor = db.ticket.find({
             'check_time': {'$gte': date_start, '$lte': date_end}
         })
