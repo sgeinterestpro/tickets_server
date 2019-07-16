@@ -37,7 +37,7 @@ class Model:
         return self.__setattr__('_{}'.format(key), value)
 
     @property
-    def object_id(self):
+    def mongo_id(self):
         if self._id is None:
             return
         return self._id
@@ -62,7 +62,7 @@ class Model:
     def to_object(self, include_id=False):
         json = {}
         if include_id:
-            json.update({'_id': self.object_id})
+            json.update({'_id': self.mongo_id})
         for key in self.fled_list:
             json.update({key: self.__getattribute__('_{}'.format(key))})
         return json
@@ -83,7 +83,6 @@ class Model:
 
 class Ticket(Model):
     collection_name = 'ticket'
-
     fled_list = ['class', 'state', 'raiser', 'raise_time', 'purchaser', 'purch_time', 'expiry_date', 'overdue_time',
                  'checker', 'check_time']
     fled_default = {
@@ -102,7 +101,6 @@ class Ticket(Model):
 
 class User(Model):
     collection_name = 'user'
-
     fled_list = [
         'wx_open_id',
         'avatarUrl',
@@ -132,7 +130,6 @@ class User(Model):
 
 class UserInit(Model):
     collection_name = 'user_init'
-
     fled_list = [
         'email',
         'real_name',

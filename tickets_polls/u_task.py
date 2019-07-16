@@ -18,5 +18,6 @@ def setup_task(app):
     scheduler.start()
     app['task'] = scheduler
     app['tasks'] = {}
+
     expiry_job = scheduler.add_job(expiry, 'cron', hour='0,1', args=[app], id='expiry')  # 每天0点处理1点处理遗漏
     app['tasks'].update({'expiry': expiry_job})
