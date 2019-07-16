@@ -40,6 +40,8 @@ class UserHandles:
     async def user_info_update(request):
         db = request.app['db']
         data = await request.json()
+        if 'userInfo' not in data:
+            return web.json_response({'code': -1, 'message': '用户信息有误'})
         _ = await db.user.update_one({
             'wx_open_id': request['open-id']
         }, {
@@ -92,7 +94,7 @@ class UserHandles:
         db = request.app['db']
         cursor = db.user_init.find()
 
-        data = {'count': 0, 'items': []}
+        count, items = 0, []
         # for ticket in await cursor.to_list(length=100):
         async for user_init_doc in cursor:
             user_init = UserInit(**user_init_doc)
@@ -101,7 +103,7 @@ class UserHandles:
             user = await User.find_one(db, {'init_id': user_init.object_id})
             if user is not None:
                 item.update(user.to_json())
-            data['items'].append(item)
-            data['count'] += 1
+            items.append(item)
+            count += 1
 
-        return web.json_response(data)
+        return web.json_response({'code': 0, 'message': '获取用户列表成功', 'count': count, 'items': items})
