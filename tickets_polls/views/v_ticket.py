@@ -26,7 +26,7 @@ class TicketHandles:
         this_week_start = date_week_start().strftime('%Y-%m-%d')
         this_week_end = date_week_end().strftime('%Y-%m-%d')
         cursor = db.ticket.find({
-            'purchaser': user.object_id,
+            'purchaser': user.mongo_id,
             'expiry_date': {'$gte': this_week_start, '$lte': this_week_end}
         })
 
@@ -56,7 +56,7 @@ class TicketHandles:
         this_week_start = date_week_start().strftime('%Y-%m-%d')
         this_week_end = date_week_end().strftime('%Y-%m-%d')
         count = await db.ticket.count_documents({
-            'purchaser': user.object_id,
+            'purchaser': user.mongo_id,
             'purch_time': {'$gte': this_week_start, '$lte': this_week_end}
         })
         if count >= 3:
@@ -71,29 +71,25 @@ class TicketHandles:
                 return web.json_response({'code': -1, 'message': '所选日期无法领取'})
 
         # 领取票券
-        # ticket = Ticket(**data)
-        # ticket.user_id = user.object_id
-        # res = await db.ticket.insert_one(ticket.to_object())
         new_value = {
             'class': data['class'],
             'state': 'valid',
-            'purchaser': user.object_id,
+            'purchaser': user.mongo_id,
             'purch_time': datetime.now(),
             'expiry_date': data['date']
         }
-        res = await db.ticket.update_one({
-            'state': 'default'
-        }, {
-            '$set': new_value
-        })
+
+        res = await db.ticket.update_one({'state': 'default'}, {'$set': new_value})
         if res.matched_count == 0:
             return web.json_response({'code': -1, 'message': '没有可领取的票券'})
         if res.modified_count == 0:
             return web.json_response({'code': -3, 'message': '更新票券信息失败'})
-        new_ticket_data = await db.ticket.find_one(new_value)
-        new_ticket = Ticket(**new_ticket_data)
+
+        # 插入票券记录
+        new_ticket = await Ticket.find_one(db, new_value)
         _ = await db.ticket_log.insert_one(
-            {'user_id': user.object_id, 'option': 'purchase', 'ticket_id': new_ticket.json_id})
+            {'user_id': user.mongo_id, 'option': 'purchase', 'ticket_id': new_ticket.json_id})
+
         return web.json_response({'code': 0, 'message': '票券领取成功'})
 
     @staticmethod
@@ -110,10 +106,22 @@ class TicketHandles:
         if 'ticket_id' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
+        ticket = await Ticket.find_one(db, {'_id': data['ticket_id']})
+
+        if ticket is None:
+            return web.json_response({'code': -1, 'message': '无法删除不存在的票券'})
+
+        if user.mongo_id != ticket['purchaser']:
+            return web.json_response({'code': -1, 'message': '无法删除他人的票券'})
+
+        date_now = datetime.now().strftime('%Y-%m-%d')
+        if date_now > ticket['expiry_date']:
+            return web.json_response({'code': -1, 'message': '无法删除已过期票券'})
+
         res = await db.ticket.update_one({
             '_id': data['ticket_id'],
             'state': 'valid',
-            'purchaser': user.object_id
+            'purchaser': user.mongo_id
         }, {
             '$set': {
                 'class': None,
@@ -129,7 +137,7 @@ class TicketHandles:
         if res.modified_count == 0:
             return web.json_response({'code': -3, 'message': '更新票券信息失败'})
         _ = await db.ticket_log.insert_one(
-            {'user_id': user.object_id, 'option': 'refund', 'ticket_id': data['ticket_id']})
+            {'user_id': user.mongo_id, 'option': 'refund', 'ticket_id': data['ticket_id']})
         return web.json_response({'code': 0, 'message': '票券删除成功'})
 
     @staticmethod
@@ -144,13 +152,12 @@ class TicketHandles:
         if 'ticket_id' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
-        ticket_doc = await db.ticket.find_one({
+        ticket = await Ticket.find_one(db, {
             '_id': data['ticket_id'],
         })
-        if ticket_doc is None:
-            return web.json_response({'code': -1, 'message': '未找到此票券'})
 
-        ticket = Ticket(**ticket_doc)
+        if ticket is None:
+            return web.json_response({'code': -1, 'message': '未找到此票券'})
 
         if ticket['state'] == 'default':
             return web.json_response({'code': -1, 'message': '票券未激活'})
@@ -187,7 +194,7 @@ class TicketHandles:
         if 'ticket_id' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
-        ticket_doc = await db.ticket.find_one({
+        ticket_doc = await Ticket.find_one(db, {
             '_id': data['ticket_id'],
         })
         if ticket_doc is None:
@@ -204,7 +211,7 @@ class TicketHandles:
         }, {
             '$set': {
                 'state': 'verified',
-                'checker': user.object_id,
+                'checker': user.mongo_id,
                 'check_time': datetime.now()
             }
         })
@@ -214,7 +221,7 @@ class TicketHandles:
         if res.modified_count == 0:
             return web.json_response({'code': -3, 'message': '更新票券信息失败'})
         _ = await db.ticket_log.insert_one(
-            {'user_id': user.object_id, 'option': 'checked', 'ticket_id': data['ticket_id']})
+            {'user_id': ticket_doc.purchaser, 'option': 'checked', 'ticket_id': data['ticket_id']})
         return web.json_response({'code': 0, 'message': '票券检票成功'})
 
     @staticmethod
@@ -227,7 +234,7 @@ class TicketHandles:
         ticket_id_base = 'SGE_{time}%s'.format(time=datetime.now().strftime('%Y%m%d'))
         raise_time = datetime.now()
         new_ticket_list = [Ticket(_id=ticket_id_base % (uuid.uuid1().hex.upper()),
-                                  raiser=user.object_id,
+                                  raiser=user.mongo_id,
                                   raise_time=raise_time).to_object(True) for _ in range(data['count'])]
         res = await db.ticket.insert_many(new_ticket_list)
         if len(res.inserted_ids) == 0:

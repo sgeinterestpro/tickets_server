@@ -73,7 +73,7 @@ class UserHandles:
         _ = await db.captcha.insert_one({
             'captcha': random_code,
             'email': data['email'],
-            'user_id': user.object_id,
+            'user_id': user.mongo_id,
             'url': final_url,
             'expire_time': datetime.utcnow()
         })
@@ -100,7 +100,7 @@ class UserHandles:
             user_init = UserInit(**user_init_doc)
             item = user_init.to_json()
             item.pop('_id')
-            user = await User.find_one(db, {'init_id': user_init.object_id})
+            user = await User.find_one(db, {'init_id': user_init.mongo_id})
             if user is not None:
                 item.update(user.to_json())
             items.append(item)
