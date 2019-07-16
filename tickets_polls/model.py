@@ -26,7 +26,7 @@ class Model:
             self._id = kwargs['_id']
         for key in self.fled_list:
             if key not in kwargs:
-                self.__setattr__('_{}'.format(key), self.fled_default.setdefault(key, None))
+                self.__setattr__('_{}'.format(key), self.fled_default.get(key, None))
             else:
                 self.__setattr__('_{}'.format(key), kwargs[key])
 
@@ -86,16 +86,7 @@ class Ticket(Model):
     fled_list = ['class', 'state', 'raiser', 'raise_time', 'purchaser', 'purch_time', 'expiry_date', 'overdue_time',
                  'checker', 'check_time']
     fled_default = {
-        'class': None,
-        'state': 'default',
-        'raiser': None,
-        'raise_time': None,
-        'purchaser': None,
-        'purch_time': None,
-        'expiry_date': None,
-        'overdue_time': None,
-        'checker': None,
-        'check_time': None
+        'state': 'default'
     }
 
 
@@ -112,7 +103,8 @@ class User(Model):
         'province',
         'init_id'
     ]
-    fled_default = {}
+    fled_default = {
+    }
 
     @staticmethod
     async def find_or_insert_one(db, data):
@@ -135,6 +127,10 @@ class UserInit(Model):
         'real_name',
         'phone',
         'work_no',
+        'sports',
         'role'
     ]
-    fled_default = {}
+    fled_default = {
+        'sports': [],
+        'role': []
+    }

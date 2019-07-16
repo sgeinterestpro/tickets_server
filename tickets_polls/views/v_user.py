@@ -29,10 +29,9 @@ class UserHandles:
         db = request.app['db']
         user_info = {}
         user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
-        user_init = await db.user_init.find_one({'_id': user['init_id']})
+        user_init = await UserInit.find_one(db, {'_id': user['init_id']})
         if user_init is not None:
-            user_init.pop('_id')
-            user_info.update(user_init)
+            user_info.update(user_init.to_json())
         user_info.update(user.to_json())
         return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user_info})
 
