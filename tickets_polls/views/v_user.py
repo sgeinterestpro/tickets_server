@@ -41,7 +41,7 @@ class UserHandles:
         db = request.app['db']
         data = await request.json()
         if 'userInfo' not in data:
-            return web.json_response({'code': -1, 'message': '用户信息有误'})
+            return web.json_response({'code': -2, 'message': '用户信息有误'})
         _ = await db.user.update_one({
             'wx_open_id': request['open-id']
         }, {
@@ -87,7 +87,7 @@ class UserHandles:
             )
             return web.json_response({'code': 0, 'message': '邮件发送成功'})
         except Exception:
-            return web.json_response({'code': -1, 'message': '邮件服务器繁忙'})
+            return web.json_response({'code': -3, 'message': '邮件服务器繁忙'})
 
     @staticmethod
     async def user_list(request):
