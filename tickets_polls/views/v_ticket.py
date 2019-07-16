@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 from aiohttp import web
 
-from model import Ticket, User
+from model import Ticket, User, UserInit
 from unit import date_week_start, date_week_end, date_month_start
 
 
@@ -419,15 +419,63 @@ class TicketHandles:
         except ValueError:
             return web.json_response({'code': -2, 'message': '日期输入错误'})
 
-        cursor = db.ticket.find({
-            'check_time': {'$gte': date_start, '$lte': date_end}
-        })
+        match = {'$match': {'check_time': {'$gte': date_start, '$lte': date_end}}}
+        # 联合查询用户信息表
+        lookup_user = {
+            '$lookup': {
+                'from': 'user',
+                'localField': 'purchaser',
+                'foreignField': '_id',
+                'as': 'users'
+            }
+        }
+        # 转换查询结果列表为数据对象
+        add_fields = {
+            '$addFields': {
+                'user': {'$arrayElemAt': ['$users', 0]}
+            }
+        }
+        # 联合查询用户工作信息表
+        lookup_real = {
+            '$lookup': {
+                'from': 'user_init',
+                'localField': 'user.init_id',
+                'foreignField': '_id',
+                'as': 'user_inits'
+            }
+        }
+        # 转换查询结果列表为数据对象
+        add_field_real = {
+            '$addFields': {
+                'user_init': {'$arrayElemAt': ['$user_inits', 0]}
+            }
+        }
+        # 删除查询结果
+        project = {'$project': {'users': 0, 'user_inits': 0}}
+        pipeline = [
+            match,
+            lookup_user,
+            add_fields,
+            lookup_real,
+            add_field_real,
+            project
+        ]
+        cursor = db.ticket.aggregate(pipeline)
+
+        # cursor = db.ticket.find({
+        #     'check_time': {'$gte': date_start, '$lte': date_end}
+        # })
 
         count, items = 0, []
         # for ticket in await cursor.to_list(length=100):
         async for ticket_doc in cursor:
             ticket = Ticket(**ticket_doc)
-            items.append(ticket.to_json())
+            item = ticket.to_json()
+            user = User(**ticket_doc.get('user', {}))
+            item['user'] = user.to_json()
+            user_init = UserInit(**ticket_doc.get('user_init', {}))
+            item['user_init'] = user_init.to_json()
+            items.append(item)
             count += 1
 
         return web.json_response({'code': 0, 'message': '获取票券使用记录成功', 'count': count, 'items': items})
