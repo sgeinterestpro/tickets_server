@@ -106,6 +106,7 @@ class TicketHandles:
         db = request.app['db']
         user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
         data = await request.json()
+
         if 'ticket_id' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
@@ -155,8 +156,14 @@ class TicketHandles:
         """
         db = request.app['db']
         data = await request.json()
+
         if 'ticket_id' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
+
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user_init = await UserInit.find_one(db, {'_id': user['init_id']})
+        if 'checker' not in user_init['role']:
+            return web.json_response({'code': -1, 'message': '没有相应权限'})
 
         ticket = await Ticket.find_one(db, {
             '_id': data['ticket_id'],
@@ -197,8 +204,14 @@ class TicketHandles:
         # Todo
         db = request.app['db']
         data = await request.json()
+
         if 'ticket_id' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
+
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user_init = await UserInit.find_one(db, {'_id': user['init_id']})
+        if 'checker' not in user_init['role']:
+            return web.json_response({'code': -1, 'message': '没有相应权限'})
 
         ticket_doc = await Ticket.find_one(db, {
             '_id': data['ticket_id'],
@@ -233,10 +246,16 @@ class TicketHandles:
     @staticmethod
     async def ticket_generate(request):
         db = request.app['db']
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
         data = await request.json()
+
         if 'count' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
+
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user_init = await UserInit.find_one(db, {'_id': user['init_id']})
+        if 'admin' not in user_init['role']:
+            return web.json_response({'code': -1, 'message': '没有相应权限'})
+
         ticket_id_base = 'SGE_{time}%s'.format(time=datetime.now().strftime('%Y%m%d'))
         raise_time = datetime.now()
         new_ticket_list = [Ticket(_id=ticket_id_base % (uuid.uuid1().hex.upper()),
@@ -250,7 +269,12 @@ class TicketHandles:
     @staticmethod
     async def ticket_usage(request):
         db = request.app['db']
+
         user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user_init = await UserInit.find_one(db, {'_id': user['init_id']})
+        if 'admin' not in user_init['role']:
+            return web.json_response({'code': -1, 'message': '没有相应权限'})
+
         this_month_start = date_month_start().strftime('%Y-%m-%d')
         this_date_now = datetime.now().strftime('%Y-%m-%d')
         default_count = await db.ticket.count_documents({
@@ -289,6 +313,12 @@ class TicketHandles:
         :return:
         """
         db = request.app['db']
+
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user_init = await UserInit.find_one(db, {'_id': user['init_id']})
+        if 'admin' not in user_init['role']:
+            return web.json_response({'code': -1, 'message': '没有相应权限'})
+
         data = await request.json()
         skip_count = data.get('skip', 0)
         limit_count = data.get('limit', 5)
@@ -409,8 +439,13 @@ class TicketHandles:
     @staticmethod
     async def ticket_check_log(request):
         db = request.app['db']
-        # user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
         data = await request.json()
+
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user_init = await UserInit.find_one(db, {'_id': user['init_id']})
+        if 'checker' not in user_init['role']:
+            return web.json_response({'code': -1, 'message': '没有相应权限'})
+
         start = data.get('start', datetime.now().strftime('%Y-%m-%d'))
         end = data.get('end', start)
         try:

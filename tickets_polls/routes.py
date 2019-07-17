@@ -20,10 +20,13 @@ def setup_routes(app):
     app.router.add_route('*', '/ticket_log', TicketHandles.ticket_log)
     app.router.add_route('*', '/ticket_check_log', TicketHandles.ticket_check_log)
 
-    app.router.add_route('*', '/user_info', UserHandles.user_info)
-    app.router.add_route('*', '/user_info_update', UserHandles.user_info_update)
     app.router.add_route('*', '/user_bind', UserHandles.user_bind)
-    app.router.add_route('*', '/user_list', UserHandles.user_list)
+    app.router.add_route('*', '/user_info', UserHandles.user_info)
+    app.router.add_route('*', '/user_update', UserHandles.user_update)
+    app.router.add_route('*', '/member_add', UserHandles.member_add)
+    app.router.add_route('*', '/member_delete', UserHandles.member_delete)
+    app.router.add_route('*', '/member_find', UserHandles.member_find)
+    app.router.add_route('*', '/member_list', UserHandles.member_list)
 
     app.router.add_route('*', '/web/email_check/{uuid}', WebHandles.email_check, name='email-check')
 
