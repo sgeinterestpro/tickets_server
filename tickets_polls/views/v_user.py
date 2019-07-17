@@ -29,7 +29,7 @@ class UserHandles:
     async def user_info(request):
         db = request.app['db']
         user_info = {}
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one(db, {'_id': user['init_id']})
         if user_init is not None:
             user_info.update(user_init.to_json())
@@ -41,18 +41,17 @@ class UserHandles:
         db = request.app['db']
         data = await request.json()
         if 'userInfo' not in data:
-            return web.json_response({'code': -2, 'message': '用户信息有误'})
-        _ = await db.user.update_one({
-            'wx_open_id': request['open-id']
-        }, {
+            return web.json_response({'code': -2, 'message': '用户信息不存在'})
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        _ = await db.user.update_one(user.to_object(), {
             '$set': data['userInfo']
         })
-        return web.json_response({'code': 0, 'message': '用户信息更新成功'})
+        return web.json_response({'code': 0, 'message': '同步用户信息成功'})
 
     @staticmethod
     async def user_bind(request):
         db = request.app['db']
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
         data = await request.json()
 
         if user['init_id']:
@@ -93,13 +92,25 @@ class UserHandles:
     async def member_add(request):
         db = request.app['db']
         data = await request.json()
-        # todo 校验邮箱手机等
+
+        if 'real_name' not in data or not data['real_name']:
+            return web.json_response({'code': -2, 'message': '姓名不能为空'})
+        if 'work_no' not in data or not data['work_no']:
+            return web.json_response({'code': -2, 'message': '工号不能为空'})
+        if 'email' not in data or not data['email']:
+            return web.json_response({'code': -2, 'message': '电子邮件不能为空'})
+        if 'phone' not in data or not data['phone']:
+            return web.json_response({'code': -2, 'message': '手机号码不能为空'})
+        if 'sports' not in data or not data['sports']:
+            return web.json_response({'code': -2, 'message': '运动项目不能为空'})
+        if 'role' not in data or not data['role']:
+            return web.json_response({'code': -2, 'message': '用户角色不能为空'})
 
         res = await db.user_init.insert_one(data)
         if res.inserted_id is None:
             return web.json_response({'code': -3, 'message': '保存用户数据失败'})
 
-        return web.json_response({'code': 0, 'message': '增加用户成功'})
+        return web.json_response({'code': 0, 'message': '添加用户成功'})
 
     @staticmethod
     async def member_delete(request):
@@ -108,7 +119,7 @@ class UserHandles:
         if 'init_id' not in data:
             return web.json_response({'code': -1, 'message': '请求参数错误'})
 
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
         if data['init_id'] == str(user['init_id']):
             return web.json_response({'code': -1, 'message': '无法删除正在使用的账号'})
 
@@ -125,7 +136,7 @@ class UserHandles:
         if 'init_id' not in data:
             return web.json_response({'code': -1, 'message': '请求参数错误'})
 
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one(db, {'_id': user['init_id']})
 
         if 'admin' not in user_init['role']:
