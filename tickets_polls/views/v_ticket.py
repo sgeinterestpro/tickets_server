@@ -22,7 +22,7 @@ class TicketHandles:
         :return:
         """
         db = request.app['db']
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
         this_week_start = date_week_start().strftime('%Y-%m-%d')
         this_week_end = date_week_end().strftime('%Y-%m-%d')
         cursor = db.ticket.find({
@@ -52,7 +52,7 @@ class TicketHandles:
         db = request.app['db']
 
         # 获取用户信息
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
         data = await request.json()
 
         # 检查本周领取限额
@@ -91,7 +91,7 @@ class TicketHandles:
         # 插入票券记录
         new_ticket = await Ticket.find_one(db, new_value)
         _ = await db.ticket_log.insert_one(
-            {'user_id': user.mongo_id, 'option': 'purchase', 'ticket_id': new_ticket.json_id})
+            {'init_id': user['init_id'], 'option': 'purchase', 'ticket_id': new_ticket.json_id})
 
         return web.json_response({'code': 0, 'message': '票券领取成功'})
 
@@ -104,7 +104,7 @@ class TicketHandles:
         """
         # todo 判断票券状态是否为已使用或已过期
         db = request.app['db']
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
         data = await request.json()
 
         if 'ticket_id' not in data:
@@ -144,7 +144,7 @@ class TicketHandles:
         if res.modified_count == 0:
             return web.json_response({'code': -3, 'message': '更新票券信息失败'})
         _ = await db.ticket_log.insert_one(
-            {'user_id': user.mongo_id, 'option': 'refund', 'ticket_id': data['ticket_id']})
+            {'init_id': user['init_id'], 'option': 'refund', 'ticket_id': data['ticket_id']})
         return web.json_response({'code': 0, 'message': '票券删除成功'})
 
     @staticmethod
@@ -160,7 +160,7 @@ class TicketHandles:
         if 'ticket_id' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one(db, {'_id': user['init_id']})
         if 'checker' not in user_init['role']:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
@@ -208,7 +208,7 @@ class TicketHandles:
         if 'ticket_id' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one(db, {'_id': user['init_id']})
         if 'checker' not in user_init['role']:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
@@ -224,7 +224,7 @@ class TicketHandles:
         if ticket_doc['expiry_date'] != date_now:
             return web.json_response({'code': -1, 'message': '票券日期不正确'})
 
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
         res = await db.ticket.update_one({
             '_id': data['ticket_id']
         }, {
@@ -239,8 +239,11 @@ class TicketHandles:
             return web.json_response({'code': -3, 'message': '找不到对应的票券'})
         if res.modified_count == 0:
             return web.json_response({'code': -3, 'message': '更新票券信息失败'})
+
+        purchaser = await User.find_one(db, {'_id': ticket_doc.purchaser})
         _ = await db.ticket_log.insert_one(
-            {'user_id': ticket_doc.purchaser, 'option': 'checked', 'ticket_id': data['ticket_id']})
+            {'init_id': purchaser['init_id'], 'option': 'checked', 'ticket_id': data['ticket_id']})
+
         return web.json_response({'code': 0, 'message': '票券检票成功'})
 
     @staticmethod
@@ -251,7 +254,7 @@ class TicketHandles:
         if 'count' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one(db, {'_id': user['init_id']})
         if 'admin' not in user_init['role']:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
@@ -270,7 +273,7 @@ class TicketHandles:
     async def ticket_usage(request):
         db = request.app['db']
 
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one(db, {'_id': user['init_id']})
         if 'admin' not in user_init['role']:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
@@ -314,7 +317,7 @@ class TicketHandles:
         """
         db = request.app['db']
 
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one(db, {'_id': user['init_id']})
         if 'admin' not in user_init['role']:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
@@ -339,36 +342,21 @@ class TicketHandles:
         # 联合查询用户信息表
         lookup_user = {
             '$lookup': {
-                'from': 'user',
-                'localField': 'user_id',
+                'from': 'user_init',
+                'localField': 'init_id',
                 'foreignField': '_id',
-                'as': 'users'
+                'as': 'inits'
             }
         }
         # 转换查询结果列表为数据对象
         add_fields = {
             '$addFields': {
                 'ticket': {'$arrayElemAt': ['$tickets', 0]},
-                'user': {'$arrayElemAt': ['$users', 0]}
-            }
-        }
-        # 联合查询用户工作信息表
-        lookup_real = {
-            '$lookup': {
-                'from': 'user_init',
-                'localField': 'user.init_id',
-                'foreignField': '_id',
-                'as': 'inits'
-            }
-        }
-        # 转换查询结果列表为数据对象
-        add_field_real = {
-            '$addFields': {
                 'init': {'$arrayElemAt': ['$inits', 0]}
             }
         }
         # 删除查询结果
-        project = {'$project': {'tickets': 0, 'users': 0, 'inits': 0}}
+        project = {'$project': {'tickets': 0, 'users': 0}}
         pipeline = [
             match,
             sort,
@@ -377,8 +365,6 @@ class TicketHandles:
             lookup_ticket,
             lookup_user,
             add_fields,
-            lookup_real,
-            add_field_real,
             project
         ]
         cursor = db.ticket_log.aggregate(pipeline)
@@ -403,18 +389,6 @@ class TicketHandles:
                     'checker': None,
                     'check_time': None
                 }, 
-                'user': {
-                    '_id': ObjectId('5d25eee4f2a471d041f759b7'),
-                    'wx_open_id': 'oZ2qW1Asmsq5MW__8yuK-IEueGIY',
-                    'avatarUrl': 'https://wx.qlogo.cn/mmopen/vi_32/DYAIOgq15epMZYIBY5flW0YiaF2d57xx0a2fhyKtSKmyQZfBVsVvE1WWibu22PRyofvHAHJOXiavNBdSkQtibWK4ow/132',
-                    'city': '',
-                    'country': '',
-                    'gender': 1,
-                    'language': 'zh_CN', 
-                    'nickName': '张三丰³',
-                    'province': '',
-                    'init_id': ObjectId('5d281c90e8834258726aa12c')
-                },
                 'init': {
                     '_id': ObjectId('5d281c90e8834258726aa12c'), 
                     'email': 'zhangsan@qq.com',
@@ -441,7 +415,7 @@ class TicketHandles:
         db = request.app['db']
         data = await request.json()
 
-        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one(db, {'_id': user['init_id']})
         if 'checker' not in user_init['role']:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
@@ -507,9 +481,11 @@ class TicketHandles:
             ticket = Ticket(**ticket_doc)
             item = ticket.to_json()
             user = User(**ticket_doc.get('user', {}))
-            item['user'] = user.to_json()
+            if user is not None:
+                item['user'] = user.to_json()
             user_init = UserInit(**ticket_doc.get('user_init', {}))
-            item['user_init'] = user_init.to_json()
+            if user_init is not None:
+                item['user_init'] = user_init.to_json()
             items.append(item)
             count += 1
 
