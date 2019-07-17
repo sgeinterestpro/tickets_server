@@ -108,6 +108,10 @@ class UserHandles:
         if 'init_id' not in data:
             return web.json_response({'code': -1, 'message': '请求参数错误'})
 
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        if data['init_id'] == str(user['init_id']):
+            return web.json_response({'code': -1, 'message': '无法删除正在使用的账号'})
+
         res = await db.user_init.delete_one({'_id': ObjectId(data['init_id'])})
         if res.deleted_count == 0:
             return web.json_response({'code': -3, 'message': '删除用户数据失败'})
