@@ -17,6 +17,7 @@ import uuid
 from datetime import datetime
 
 from aiohttp import web
+from bson import ObjectId
 
 from model import User, UserInit
 from u_email import EmailSender
@@ -36,7 +37,7 @@ class UserHandles:
         return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user_info})
 
     @staticmethod
-    async def user_info_update(request):
+    async def user_update(request):
         db = request.app['db']
         data = await request.json()
         if 'userInfo' not in data:
@@ -89,20 +90,78 @@ class UserHandles:
             return web.json_response({'code': -3, 'message': '邮件服务器繁忙'})
 
     @staticmethod
-    async def user_list(request):
+    async def member_add(request):
+        db = request.app['db']
+        data = await request.json()
+        # todo 校验邮箱手机等
+
+        res = await db.user_init.insert_one(data)
+        if res.inserted_id is None:
+            return web.json_response({'code': -3, 'message': '保存用户数据失败'})
+
+        return web.json_response({'code': 0, 'message': '增加用户成功'})
+
+    @staticmethod
+    async def member_delete(request):
+        db = request.app['db']
+        data = await request.json()
+        if 'init_id' not in data:
+            return web.json_response({'code': -1, 'message': '请求参数错误'})
+
+        res = await db.user_init.delete_one({'_id': ObjectId(data['init_id'])})
+        if res.deleted_count == 0:
+            return web.json_response({'code': -3, 'message': '删除用户数据失败'})
+
+        return web.json_response({'code': 0, 'message': '删除用户成功'})
+
+    @staticmethod
+    async def member_find(request):
+        db = request.app['db']
+        data = await request.json()
+        if 'init_id' not in data:
+            return web.json_response({'code': -1, 'message': '请求参数错误'})
+
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
+        user_init = await UserInit.find_one(db, {'_id': user['init_id']})
+
+        if 'admin' not in user_init['role']:
+            return web.json_response({'code': -1, 'message': '没有相应权限'})
+
+        user_info = {}
+
+        t_user_init = await UserInit.find_one(db, {'_id': ObjectId(data['init_id'])})
+
+        t_user = await User.find_one(db, {'init_id': t_user_init.mongo_id})
+        if t_user is not None:
+            user_info.update(t_user.to_json())
+            user_info['user_id'] = user_info.pop('_id')
+
+        user_info.update(t_user_init.to_json())
+        user_info['init_id'] = user_info.pop('_id')
+
+        return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user_info})
+
+    @staticmethod
+    async def member_list(request):
         db = request.app['db']
         cursor = db.user_init.find()
 
         count, items = 0, []
         # for ticket in await cursor.to_list(length=100):
         async for user_init_doc in cursor:
-            user_init = UserInit(**user_init_doc)
-            item = user_init.to_json()
-            item.pop('_id')
-            user = await User.find_one(db, {'init_id': user_init.mongo_id})
-            if user is not None:
-                item.update(user.to_json())
-            items.append(item)
+            user_info = {}
+
+            t_user_init = UserInit(**user_init_doc)
+
+            t_user = await User.find_one(db, {'init_id': t_user_init.mongo_id})
+            if t_user is not None:
+                user_info.update(t_user.to_json())
+                user_info['user_id'] = user_info.pop('_id')
+
+            user_info.update(t_user_init.to_json())
+            user_info['init_id'] = user_info.pop('_id')
+
+            items.append(user_info)
             count += 1
 
         return web.json_response({'code': 0, 'message': '获取用户列表成功', 'count': count, 'items': items})
