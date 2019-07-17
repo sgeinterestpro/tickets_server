@@ -240,7 +240,7 @@ class TicketHandles:
         if res.modified_count == 0:
             return web.json_response({'code': -3, 'message': '更新票券信息失败'})
 
-        purchaser = await User.find_one(db, {'_id': ticket_doc.purchaser})
+        purchaser = await User.find_one(db, {'_id': ticket_doc['purchaser']})
         _ = await db.ticket_log.insert_one(
             {'init_id': purchaser['init_id'], 'option': 'checked', 'ticket_id': data['ticket_id']})
 
