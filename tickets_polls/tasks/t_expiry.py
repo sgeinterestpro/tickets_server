@@ -10,7 +10,7 @@ from datetime import datetime
 async def expiry(app):
     db = app['db']
     date_now = datetime.now().strftime('%Y-%m-%d')
-    res = await db.ticket.update({
+    res = await db.ticket.update_many({
         'state': 'valid',
         'expiry_date': {'$lt': date_now}
     }, {
