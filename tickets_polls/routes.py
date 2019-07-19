@@ -28,6 +28,8 @@ def setup_routes(app):
     app.router.add_route('*', '/member_find', UserHandles.member_find)
     app.router.add_route('*', '/member_list', UserHandles.member_list)
 
+    app.router.add_route('*', '/report_export', ReportHandles.report_export)
+
     app.router.add_route('*', '/web/email_check/{uuid}', WebHandles.email_check, name='email-check')
 
 

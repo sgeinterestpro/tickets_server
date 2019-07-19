@@ -18,19 +18,17 @@ mail_pass = None
 def setup_email(app):
     app['email'] = EmailSender
 
-    conf = app['config']
-
     global mail_charset
-    mail_charset = conf['email']['charset']
+    mail_charset = app['config']['email']['charset']
 
     global mail_host
-    mail_host = conf['email']['host']
+    mail_host = app['config']['email']['host']
 
     global mail_user
-    mail_user = conf['email']['user']
+    mail_user = app['config']['email']['user']
 
     global mail_pass
-    mail_pass = conf['email']['pass']
+    mail_pass = app['config']['email']['pass']
 
 
 class EmailSender:

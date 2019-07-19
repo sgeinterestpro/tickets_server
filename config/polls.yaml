@@ -8,7 +8,7 @@ database:
   user:
   pass:
 email:
-  charset: 'utf-8'
+  charset: 'gbk'
   # sina
   # host = smtp.sina.com
   # user = sge_notify@sina.com
@@ -17,3 +17,14 @@ email:
   host: smtp.163.com
   user: sge_notify@163.com
   pass: Sge2002
+ticket:
+  sport:
+    badminton  : 羽毛球
+    basketball : 篮球
+    football   : 足球
+    swim       : 游泳
+    yoga       : 瑜伽
+  state:
+    valid    : 未使用
+    expired  : 已过期
+    verified : 已使用

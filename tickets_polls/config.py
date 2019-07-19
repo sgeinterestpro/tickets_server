@@ -10,7 +10,7 @@ import yaml
 
 
 def load_config(config_path):
-    with open(config_path, 'r') as f:
+    with open(config_path, 'r', encoding='utf-8') as f:
         cfg = f.read()
         config = yaml.load(cfg, Loader=yaml.BaseLoader)  # 用load方法转字典
     return config
