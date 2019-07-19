@@ -9,22 +9,35 @@ database:
   pass:
 email:
   charset: 'gbk'
-  # sina
-  # host = smtp.sina.com
-  # user = sge_notify@sina.com
-  # pass = Sge20021030
-  # 163
-  host: smtp.163.com
-  user: sge_notify@163.com
-  pass: Sge2002
+  servers:
+    - # yeah
+      host: smtp.yeah.net
+      user: sge_notify@yeah.net
+      pass: Sge2002
+    - # sohu
+      host: smtp.sohu.com
+      user: sge_notify@sohu.com
+      pass: Sge20021030
+    - # sina
+      host: smtp.sina.com
+      user: sge_notify@sina.com
+      pass: Sge20021030
+    - # 163
+      host: smtp.163.com
+      user: sge_notify@163.com
+      pass: Sge2002
+    - # 126
+      host: smtp.126.com
+      user: sge_notify@126.com
+      pass: Sge2002
 ticket:
   sport:
-    badminton  : 羽毛球
-    basketball : 篮球
-    football   : 足球
-    swim       : 游泳
-    yoga       : 瑜伽
+    badminton: 羽毛球
+    basketball: 篮球
+    football: 足球
+    swim: 游泳
+    yoga: 瑜伽
   state:
-    valid    : 未使用
-    expired  : 已过期
-    verified : 已使用
+    valid: 未使用
+    expired: 已过期
+    verified: 已使用

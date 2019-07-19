@@ -10,9 +10,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 mail_charset = None
-mail_host = None
-mail_user = None
-mail_pass = None
+mail_servers = []
 
 
 def setup_email(app):
@@ -21,62 +19,58 @@ def setup_email(app):
     global mail_charset
     mail_charset = app['config']['email']['charset']
 
-    global mail_host
-    mail_host = app['config']['email']['host']
-
-    global mail_user
-    mail_user = app['config']['email']['user']
-
-    global mail_pass
-    mail_pass = app['config']['email']['pass']
+    global mail_servers
+    mail_servers = app['config']['email']['servers']
 
 
 class EmailSender:
     @staticmethod
     def send(to_addrs, subject, mail_msg, attachs=None):
-        logging.debug((to_addrs, subject, mail_msg, attachs))
-        from_addr = mail_user
-        if isinstance(to_addrs, str):
-            to_addrs = [to_addrs]
+        for mail_server in mail_servers:
+            logging.debug((to_addrs, subject, mail_msg, attachs))
+            from_addr = mail_server['user']
+            if isinstance(to_addrs, str):
+                to_addrs = [to_addrs]
 
-        if attachs is None:
-            message = MIMEText(mail_msg, _subtype='html', _charset=mail_charset)
-        else:
-            message = MIMEMultipart()
-            msg_text = MIMEText(mail_msg, _subtype='html', _charset=mail_charset)
-            message.attach(msg_text)
+            if attachs is None:
+                message = MIMEText(mail_msg, _subtype='html', _charset=mail_charset)
+            else:
+                message = MIMEMultipart()
+                msg_text = MIMEText(mail_msg, _subtype='html', _charset=mail_charset)
+                message.attach(msg_text)
 
-            if isinstance(attachs, tuple):
-                attachs = [attachs]
+                if isinstance(attachs, tuple):
+                    attachs = [attachs]
 
-            for attach_name, attach_io in attachs:
-                attachment = MIMEText(attach_io.getvalue(), 'base64', mail_charset)
-                attachment['Content-Type'] = Header('application/octet-stream')
-                # att_tmp['Content-Disposition'] = f'attachment; filename="{attach_name}"' # 纯英文可用
-                attachment.add_header('Content-Disposition', 'attachment', filename=(mail_charset, '', attach_name))
-                message.attach(attachment)
+                for attach_name, attach_io in attachs:
+                    attachment = MIMEText(attach_io.getvalue(), 'base64', mail_charset)
+                    attachment['Content-Type'] = Header('application/octet-stream')
+                    # att_tmp['Content-Disposition'] = f'attachment; filename="{attach_name}"' # 纯英文可用
+                    attachment.add_header('Content-Disposition', 'attachment', filename=(mail_charset, '', attach_name))
+                    message.attach(attachment)
 
-        message['X-Mailer'] = 'Microsoft Outlook Express 6.00.2900.2869'
-        # message['Subject'] = subject # 纯英文可用
-        message['Subject'] = Header(subject, charset=mail_charset).encode()
-        message['From'] = from_addr
-        message['To'] = ';'.join(to_addrs)
+            message['X-Mailer'] = 'Microsoft Outlook Express 6.00.2900.2869'
+            # message['Subject'] = subject # 纯英文可用
+            message['Subject'] = Header(subject, charset=mail_charset).encode()
+            message['From'] = from_addr
+            message['To'] = ';'.join(to_addrs)
+            message['Bcc'] = ";".join([from_addr])
 
-        try:
-            with SmtpServer(mail_host, 25) as smtp_server:
-                send_errs = smtp_server.sendmail(from_addr, to_addrs, message.as_string())
-                if not send_errs:
-                    logging.debug('邮件发送成功')
-                else:
-                    logging.error('邮件发送失败')
-                    logging.error(send_errs)
-        except Exception as e:
-            logging.exception(e)
-            raise e
+            try:
+                with SmtpServer(mail_server['host'], 25, mail_server['user'], mail_server['pass']) as smtp_server:
+                    send_errs = smtp_server.sendmail(from_addr, to_addrs, message.as_string())
+                    if not send_errs:
+                        logging.debug('邮件发送成功')
+                        break
+                    else:
+                        logging.error('邮件发送失败')
+                        logging.error(send_errs)
+            except Exception as e:
+                logging.exception(e)
 
 
 class SmtpServer:
-    def __init__(self, host, port):
+    def __init__(self, host, port, mail_user, mail_pass):
         _server = smtplib.SMTP(host, port)
         _server.login(mail_user, mail_pass)
         self.server = _server
@@ -101,9 +95,7 @@ if __name__ == '__main__':
 
     conf = load_config(str(pathlib.Path('..') / 'config' / 'polls.yaml'))
     mail_charset = conf['email']['charset']
-    mail_host = conf['email']['host']
-    mail_user = conf['email']['user']
-    mail_pass = conf['email']['pass']
+    mail_servers = conf['email']['servers']
 
     import xlwt
     from io import BytesIO
