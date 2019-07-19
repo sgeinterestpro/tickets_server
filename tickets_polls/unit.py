@@ -32,5 +32,5 @@ def date_month_end(date=datetime.now()):
     给定日期所在结算周的所属月结束的最后一天
     :return:
     """
-    next_month = datetime(year=date.year, month=date.month - 1, day=date.day)
-    return date_week_start(next_month) + timedelta(days=-1)
+    next_month = datetime(year=date.year, month=date.month + 1, day=date.day)
+    return date_month_start(next_month) + timedelta(days=-1)

@@ -35,6 +35,7 @@
 #                    $               $
 
 from .v_default import default_handle
+from .v_report import ReportHandles
 from .v_ticket import TicketHandles
 from .v_user import UserHandles
 from .v_web import WebHandles
