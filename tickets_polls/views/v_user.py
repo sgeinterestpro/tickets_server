@@ -80,9 +80,87 @@ class UserHandles:
         try:
             EmailSender.send(
                 data['email'], '票券小程序账号绑定验证邮件',
-                f'''
-您好：请<a href="{final_url}" target="_blank">点击这里</a>验证邮箱来绑定票券小程序
-'''
+                f'''<style class="fox_global_style">
+    div.fox_html_content {{ line-height: 1.5; }}
+    /* 一些默认样式 */
+    blockquote {{ margin-Top: 0px; margin-Bottom: 0px; margin-Left: 0.5em }}
+    ol, ul {{ margin-Top: 0px; margin-Bottom: 0px; list-style-position: inside; }}
+    p {{ margin-Top: 0px; margin-Bottom: 0px }}
+</style>
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tbody><tr><td bgcolor="#f7f9fa" align="center" style="padding:22px 0 20px 0" class="responsive-table">
+        <table border="0" cellpadding="0" cellspacing="0" style="background-color:f7f9fa; border-radius:3px;border:1px solid #dedede;margin:0 auto; background-color:#ffffff" width="552" class="responsive-table">
+            <tbody><tr><td bgcolor="#ffffff" height="54" align="center" style="border-top-left-radius:3px;border-top-right-radius:3px;border-bottom-width: 1px;border-bottom-style: solid;border-bottom-color: #dedede;">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%"><tbody><tr>
+                    <td align="center" class="zhwd-high-res-img-wrap zhwd-zhihu-logo">
+                        <img src="https://www.sge.com.cn/static/images/logo.png" width="198" height="46" alt="SGE" style="outline:none; display:block; border:none; font-size:14px; font-family:Hiragino Sans GB; color:#ffffff;"></a>
+                    </td>
+                </tr></tbody></table>
+            </td></tr>
+            <tr><td bgcolor="#ffffff" align="center" style="padding: 0 15px 0px 15px;">
+                <table border="0" cellpadding="0" cellspacing="0" width="480" class="responsive-table">
+                    <tbody><tr><td><table width="100%" border="0" cellpadding="0" cellspacing="0">
+                        <tbody><tr><td><table cellpadding="0" cellspacing="0" border="0" align="left" class="responsive-table">
+                            <tbody><tr><td width="550" align="left" valign="top">
+                                <table width="100%" border="0" cellpadding="0" cellspacing="0">
+                                    <tbody>
+                                    <tr>
+                                        <td bgcolor="#ffffff" align="left" style="background-color:#ffffff; font-size: 17px; color:#7b7b7b; padding:28px 0 0 0;line-height:25px;">
+                                            <b>您好!</b>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td align="left" valign="top" style="font-size:15px; color:#7b7b7b; font-size:14px; line-height: 25px; font-family:Hiragino Sans GB; padding: 20px 0px 20px 0px">
+                                            感谢您使用本程序,请点击以下链接绑定帐号:
+                                        </td>
+                                    </tr>
+                                    <tr><td style="border-bottom:1px #f1f4f6 solid; padding: 10px 0 35px 0;" align="center" class="padding">
+                                        <table border="0" cellspacing="0" cellpadding="0" class="responsive-table">
+                                            <tbody>
+                                            <tr>
+                                                <td>
+                                                    <span style="font-family:Hiragino Sans GB;font-size:17px;">
+                                                        <a style="text-decoration:none;color:#ffffff;"
+                                                           href="{final_url}"
+                                                           target="_blank">
+                                                            <div style="padding:10px 25px 10px 25px;border-radius:3px;text-align:center;text-decoration:none;background-color:#0a82e4;color:#ffffff;font-size:17px;margin:0;white-space:nowrap">
+                                                                立即绑定帐号
+                                                            </div>
+                                                        </a>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            </tbody>
+                                        </table>
+                                    </td></tr>
+                                    <tr>
+                                        <td align="left" valign="top" style="font-size:15px; color:#7b7b7b; font-size:14px; line-height: 25px; font-family:Hiragino Sans GB; padding: 20px 0px 35px 0px">
+                                            如果以上按钮无法打开，请把下面的链接复制到浏览器地址栏中打开：{final_url}
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </td>
+            </tr>
+            </tbody>
+        </table>
+    </td>
+    </tr>
+    </tbody>
+</table>
+                '''
             )
             return web.json_response({'code': 0, 'message': '邮件发送成功'})
         except Exception:
