@@ -26,6 +26,7 @@ def setup_email(app):
 class EmailSender:
     @staticmethod
     def send(to_addrs, subject, mail_msg, attachs=None):
+        logging.debug('邮件收件人：' + to_addrs)
         for mail_server in mail_servers:
             logging.debug((to_addrs, subject, mail_msg, attachs))
             from_addr = mail_server['user']
@@ -57,6 +58,7 @@ class EmailSender:
             message['Bcc'] = ";".join([from_addr])
 
             try:
+                logging.debug('使用邮件服务器：' + mail_server['host'])
                 with SmtpServer(mail_server['host'], 25, mail_server['user'], mail_server['pass']) as smtp_server:
                     send_errs = smtp_server.sendmail(from_addr, to_addrs, message.as_string())
                     if not send_errs:

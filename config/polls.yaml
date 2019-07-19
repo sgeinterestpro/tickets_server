@@ -10,10 +10,6 @@ database:
 email:
   charset: 'gbk'
   servers:
-    - # yeah
-      host: smtp.yeah.net
-      user: sge_notify@yeah.net
-      pass: Sge2002
     - # sohu
       host: smtp.sohu.com
       user: sge_notify@sohu.com
@@ -22,6 +18,10 @@ email:
       host: smtp.sina.com
       user: sge_notify@sina.com
       pass: Sge20021030
+    - # yeah
+      host: smtp.yeah.net
+      user: sge_notify@yeah.net
+      pass: Sge2002
     - # 163
       host: smtp.163.com
       user: sge_notify@163.com
