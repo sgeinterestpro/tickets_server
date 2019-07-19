@@ -188,11 +188,18 @@ class TicketHandles:
         if ticket['expiry_date'] > date_now:
             return web.json_response({'code': -1, 'message': '票券未生效'})
 
-        user_doc = await db.user.find_one({
+        purchaser = await User.find_one(db, {
             '_id': ticket['purchaser']
         })
-        user = User(**user_doc)
-        return web.json_response({'code': 0, 'message': '票券状态核验通过', 'ticket': ticket.to_json(), 'user': user.to_json()})
+        purchaser_init = await UserInit.find_one(db, {
+            '_id': purchaser['init_id']
+        })
+        return web.json_response({
+            'code': 0, 'message': '票券状态核验通过',
+            'ticket': ticket.to_json(),
+            'user': purchaser.to_json(),
+            'init': purchaser_init.to_json()
+        })
 
     @staticmethod
     async def ticket_checked(request):
