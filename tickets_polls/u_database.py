@@ -18,10 +18,10 @@ def setup_database(app):
     # uri += '/{}'.format(quote_plus(conf['database']['name']))
     client = AsyncIOMotorClient(uri)
     app['db'] = client.get_database('ticket')
-    config_database(uri)
+    config_database(app, uri)
 
 
-def config_database(uri):
+def config_database(app, uri):
     client = MongoClient(uri)
     db = client.get_database('ticket')
     # db.captcha.create_index('expire_time', expireAfterSeconds=3600)
@@ -31,5 +31,13 @@ def config_database(uri):
     except Exception:
         pass
     db.captcha.create_index('expire_time', expireAfterSeconds=600)
+
+    mail_servers = app['config']['email']['servers']
+    for server in mail_servers:
+        server['limit'] = int(server['limit'])
+        server['port'] = int(server['port'])
+        db.email.find_one_and_replace({
+            'user': server['user']
+        }, server, upsert=True)
     client.close()
     pass

@@ -21,6 +21,8 @@ import openpyxl
 from openpyxl.styles import Border, Side, Alignment, Font
 from openpyxl.utils import get_column_letter
 
+from model import Email
+from u_email import EmailSender
 from unit import date_month_start, date_month_end
 
 
@@ -56,7 +58,7 @@ def date_show(date, fmt):
 
 
 class ReportBase:
-    sender = None
+    sender: EmailSender = None
     db = None
     config = None
     sport_map = None
@@ -100,7 +102,8 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
 
     async def send(self, email_addr):
         attachs = await self.get_attachs()
-        self.sender.send(email_addr, self._email_subject, self._mail_msg, attachs)
+        email_server = await Email.use_one(self.db)
+        self.sender.send(email_server, email_addr, self._email_subject, self._mail_msg, attachs)
 
 
 class ReportCheckLogFlow(ReportBase):
@@ -527,7 +530,7 @@ if __name__ == '__main__':
     import pathlib
     import asyncio
     from motor.motor_asyncio import AsyncIOMotorClient
-    from u_email import EmailSender
+    from u_email import EmailSender, EmailSender, EmailSender, EmailSender, EmailSender
     from config import load_config
     from urllib.parse import quote_plus
 

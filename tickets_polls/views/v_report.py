@@ -16,6 +16,7 @@
 from aiohttp import web
 
 from model import User, UserInit
+from u_report import ReportBase
 
 
 class ReportHandles:
@@ -38,7 +39,7 @@ class ReportHandles:
         user_init = await UserInit.find_one(db, {'_id': user['init_id']})
 
         report_class = reports[report_type]
-        report = report_class(date_start, date_end)
+        report = report_class(date_start, date_end)  # type: ReportBase
         await report.send(user_init['email'])
 
         return web.json_response({'code': 0, 'message': f'报表发送到{user_init["email"]}成功'})
