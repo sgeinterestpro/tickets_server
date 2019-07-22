@@ -134,3 +134,31 @@ class UserInit(Model):
         'sports': [],
         'role': []
     }
+
+
+class Email(Model):
+    collection_name = 'user_init'
+    fled_list = [
+        'host',
+        'port',
+        'user',
+        'pass',
+        'limit',
+        'used'
+    ]
+    fled_default = {
+        'limit': 0,
+        'used': 0
+    }
+
+    @staticmethod
+    async def use_one(db):
+        cursor = db.email.find()
+        async for server in cursor:
+            if server.get('used', 0) < server.get('limit', 0):
+                await db.email.update_one({
+                    'user': server['user']
+                }, {'$set': {
+                    'used': server.get('used', 0) + 1
+                }})
+                return server

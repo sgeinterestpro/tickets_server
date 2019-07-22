@@ -19,7 +19,7 @@ from datetime import datetime
 from aiohttp import web
 from bson import ObjectId
 
-from model import User, UserInit
+from model import User, UserInit, Email
 from u_email import EmailSender
 
 
@@ -76,9 +76,12 @@ class UserHandles:
             'url': final_url,
             'expire_time': datetime.utcnow()
         })
+
+        email_server = await Email.use_one(db)
         # noinspection PyBroadException
         try:
             EmailSender.send(
+                email_server,
                 data['email'], '票券小程序账号绑定验证邮件',
                 f'''<style class="fox_global_style">
     div.fox_html_content {{ line-height: 1.5; }}

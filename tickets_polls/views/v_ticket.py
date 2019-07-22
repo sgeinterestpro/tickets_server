@@ -260,6 +260,10 @@ class TicketHandles:
 
         if 'count' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
+        try:
+            data_count = int(data['count'])
+        except ValueError:
+            return web.json_response({'code': -2, 'message': '数量只能为十进制罗马数字'})
 
         user = await User.find_one(db, {'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one(db, {'_id': user['init_id']})
@@ -270,7 +274,7 @@ class TicketHandles:
         raise_time = datetime.now()
         new_ticket_list = [Ticket(_id=ticket_id_base % (uuid.uuid1().hex.upper()),
                                   raiser=user.mongo_id,
-                                  raise_time=raise_time).to_object(True) for _ in range(data['count'])]
+                                  raise_time=raise_time).to_object(True) for _ in range(data_count)]
         res = await db.ticket.insert_many(new_ticket_list)
         if len(res.inserted_ids) == 0:
             return web.json_response({'code': -3, 'message': '生成票券失败'})
