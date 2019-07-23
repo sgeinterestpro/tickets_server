@@ -91,7 +91,7 @@ class ReportBase:
 
     async def send(self, email_addr):
         attachs = await self.get_attachs()
-        await self.sender.send(self.db, email_addr, self._email_subject, self._mail_msg, attachs)
+        await self.sender.send(email_addr, self._email_subject, self._mail_msg, attachs)
 
 
 class ReportCheckLogFlow(ReportBase):

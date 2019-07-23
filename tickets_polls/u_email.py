@@ -9,8 +9,10 @@ from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+import dns.resolver
+
 mail_charset = None
-mail_servers = []
+mail_server = 'system@sge-tech.com'
 
 
 def setup_email(app):
@@ -25,65 +27,59 @@ def setup_email(app):
 
 class EmailSender:
     @staticmethod
-    async def send(db, to_addrs, subject, mail_msg, attachs=None):
-        cursor = db.email.find()
-        async for server in cursor:
-            if server.get('used', 0) < server.get('limit', 0):
-                await db.email.update_one({
-                    'user': server['user']
-                }, {'$set': {
-                    'used': server.get('used', 0) + 1
-                }})
-            else:
-                continue
-            logging.debug('邮件收件人：' + to_addrs)
-            logging.debug((to_addrs, subject, mail_msg, attachs))
-            from_addr = server['user']
-            if isinstance(to_addrs, str):
-                to_addrs = [to_addrs]
+    async def send(to_addrs, subject, mail_msg, attachs=None):
+        logging.debug(('邮件收件人：', to_addrs))
+        logging.debug((to_addrs, subject, mail_msg, attachs))
+        from_addr = mail_server
+        if isinstance(to_addrs, str):
+            to_addrs = [to_addrs]
 
-            if attachs is None:
-                message = MIMEText(mail_msg, _subtype='html', _charset=mail_charset)
-            else:
-                message = MIMEMultipart()
-                msg_text = MIMEText(mail_msg, _subtype='html', _charset=mail_charset)
-                message.attach(msg_text)
+        if attachs is None:
+            message = MIMEText(mail_msg, _subtype='html', _charset=mail_charset)
+        else:
+            message = MIMEMultipart()
+            msg_text = MIMEText(mail_msg, _subtype='html', _charset=mail_charset)
+            message.attach(msg_text)
 
-                if isinstance(attachs, tuple):
-                    attachs = [attachs]
+            if isinstance(attachs, tuple):
+                attachs = [attachs]
 
-                for attach_name, attach_io in attachs:
-                    attachment = MIMEText(attach_io.getvalue(), 'base64', mail_charset)
-                    attachment['Content-Type'] = Header('application/octet-stream')
-                    # att_tmp['Content-Disposition'] = f'attachment; filename="{attach_name}"' # 纯英文可用
-                    attachment.add_header('Content-Disposition', 'attachment', filename=(mail_charset, '', attach_name))
-                    message.attach(attachment)
+            for attach_name, attach_io in attachs:
+                attachment = MIMEText(attach_io.getvalue(), 'base64', mail_charset)
+                attachment['Content-Type'] = Header('application/octet-stream')
+                # att_tmp['Content-Disposition'] = f'attachment; filename="{attach_name}"' # 纯英文可用
+                attachment.add_header('Content-Disposition', 'attachment', filename=(mail_charset, '', attach_name))
+                message.attach(attachment)
 
-            message['X-Mailer'] = 'Microsoft Outlook Express 6.00.2900.2869'
-            # message['Subject'] = subject # 纯英文可用
-            message['Subject'] = Header(subject, charset=mail_charset).encode()
-            message['From'] = from_addr
-            message['To'] = ';'.join(to_addrs)
-            message['Bcc'] = ";".join([from_addr])
+        # message['Subject'] = subject # 纯英文可用
+        message['Subject'] = Header(subject, charset=mail_charset).encode()
+        message['From'] = from_addr
+        message['To'] = ';'.join(to_addrs)
+        message['Bcc'] = ";".join([from_addr])
 
-            try:
-                logging.debug('使用邮件服务器：' + server['host'])
-                with SmtpServer(server['host'], 25, server['user'], server['pass']) as smtp_server:
-                    send_errs = smtp_server.sendmail(from_addr, to_addrs, message.as_string())
-                    if not send_errs:
-                        logging.debug('邮件发送成功')
-                        break
-                    else:
-                        logging.error('邮件发送失败')
-                        logging.error(send_errs)
-            except Exception as e:
-                logging.exception(e)
+        try:
+            to_server_set = set([to_addr.split('@')[1] for to_addr in to_addrs])
+            for to_server in to_server_set:
+                try:
+                    with SmtpServer(to_server) as smtp_server:
+                        send_errs = smtp_server.send_message(message, from_addr, to_addrs)
+                        if not send_errs:
+                            logging.debug(f'邮件投递到{to_server}成功')
+                        else:
+                            logging.error(f'邮件投递到{to_server}失败')
+                            logging.error(send_errs)
+                except dns.resolver.NoAnswer:
+                    logging.error(f'服务器 {to_server} MX 记录解析失败')
+        except Exception as e:
+            logging.error(f'邮件投递失败')
+            logging.exception(e)
 
 
 class SmtpServer:
-    def __init__(self, host, port, mail_user, mail_pass):
-        _server = smtplib.SMTP(host, port)
-        _server.login(mail_user, mail_pass)
+    def __init__(self, server):
+        mx = dns.resolver.query(server, 'MX')
+        email_server = mx[0].exchange.to_text()
+        _server = smtplib.SMTP(email_server)
         self.server = _server
 
     def __enter__(self):
