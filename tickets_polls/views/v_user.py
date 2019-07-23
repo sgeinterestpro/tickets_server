@@ -90,7 +90,6 @@ class UserHandles:
         # noinspection PyBroadException
         try:
             await EmailSender.send(
-                db,
                 data['email'], '票券小程序账号绑定验证邮件',
                 msg(final_url)
             )
