@@ -13,6 +13,8 @@
 @Desc    : 
 
 """
+from datetime import datetime
+
 from aiohttp import web
 
 from model import User, UserInit
@@ -30,6 +32,13 @@ class ReportHandles:
 
         report_type = data['type']
         date_start, date_end = data['start'], data['end']
+
+        # 修复不选择日期直接导出报表的BUG
+        try:
+            datetime.strptime(date_start, "%Y-%m-%d")
+            datetime.strptime(date_end, "%Y-%m-%d")
+        except ValueError:
+            return web.json_response({'code': -1, 'message': '请选择正确的日期'})
 
         reports = request.app['report']
         if report_type not in reports:
