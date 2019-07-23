@@ -71,9 +71,14 @@ class EmailSender:
                             logging.error(send_errs)
                 except dns.resolver.NoAnswer:
                     logging.error(f'服务器 {to_server} MX 记录解析失败')
-        except Exception as e:
+        except smtplib.SMTPDataError as err:
             logging.error(f'邮件投递失败')
-            logging.exception(e)
+            logging.exception(err)
+            raise smtplib.SMTPDataError(err.smtp_code, err.smtp_error)
+        except Exception as err:
+            logging.error(f'邮件投递失败')
+            logging.exception(err)
+            raise smtplib.SMTPDataError(-1, b'Unknown Error')
 
 
 class SmtpServer:

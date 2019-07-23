@@ -13,6 +13,7 @@
 @Desc    : 
 
 """
+import smtplib
 from datetime import datetime
 
 from aiohttp import web
@@ -49,6 +50,8 @@ class ReportHandles:
 
         report_class = reports[report_type]
         report = report_class(date_start, date_end)  # type: ReportBase
-        await report.send(user_init['email'])
-
+        try:
+            await report.send(user_init['email'])
+        except smtplib.SMTPDataError as err:
+            return web.json_response({'code': -3, 'message': err.smtp_error.decode()})
         return web.json_response({'code': 0, 'message': f'报表发送到{user_init["email"]}成功'})
