@@ -87,11 +87,10 @@ class UserHandles:
             'expire_time': datetime.utcnow()
         })
 
-        email_server = await Email.use_one(db)
         # noinspection PyBroadException
         try:
-            EmailSender.send(
-                email_server,
+            await EmailSender.send(
+                db,
                 data['email'], '票券小程序账号绑定验证邮件',
                 msg(final_url)
             )
