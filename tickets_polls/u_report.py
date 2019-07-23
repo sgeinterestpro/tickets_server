@@ -57,6 +57,13 @@ def date_show(date, fmt):
     return datetime.strptime(date, "%Y-%m-%d").strftime(fmt)
 
 
+def msg(final_url):
+    return f'''
+    <p><b>尊敬的用户，您好！</b></p>
+    <p>您于{datetime.now().strftime("%Y-%m-%d %H:%M")}导出了《{self._email_attach}》。 <br> 附件为您本次申请导出的报表。</p> 
+'''
+
+
 class ReportBase:
     sender: EmailSender = None
     db = None
@@ -75,26 +82,8 @@ class ReportBase:
     @property
     def _mail_msg(self):
         return f'''
-<style class="fox_global_style"> 
-div.fox_html_content {{ line-height: 1.5;}} 
-/* 一些默认样式 */ 
-blockquote {{ margin-Top: 0px; margin-Bottom: 0px; margin-Left: 0.5em }} 
-ol, ul {{ margin-Top: 0px; margin-Bottom: 0px; list-style-position: inside; }} 
-p {{ margin-Top: 0px; margin-Bottom: 0px }} 
-</style>
-<div style="border-bottom:3px solid #d9d9d9; background:url(http://exmail.qq.com/zh_CN/htmledition/images/domainmail/bizmail_bg.gif) repeat-x 0 1px #FFFFFF;"> 
-    <div style="border:1px solid #c8cfda; padding:40px;"> 
-        <div> 
-            <p>尊敬的用户，您好！<br> <br> </p> 
-            <p>您于{datetime.now().strftime("%Y-%m-%d %H:%M")}导出了《{self._email_attach}》。 <br> 附件为您本次申请导出的报表。</p> 
-            <br> <br> 
-        </div> 
-        <div>本邮件由服务器自动发送</div> 
-        <div style="border-top:1px solid #ccc;padding:10px 0;font-size:12px;margin:20px 0;"> 
-            票券助手站点：<a href="http://ticket.sge-tech.com">http://ticket.sge-tech.com</a><br> 
-        </div> 
-    </div> 
-</div>
+<p><b>尊敬的用户，您好！</b></p>
+<p>您于{datetime.now().strftime("%Y-%m-%d %H:%M")}导出了《{self._email_attach}》。 <br> 附件为您本次申请导出的报表。</p> 
 '''
 
     async def get_attachs(self):
