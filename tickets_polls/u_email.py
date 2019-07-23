@@ -6,6 +6,7 @@ author: muumlover
 import logging
 import smtplib
 from email.header import Header
+from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -45,17 +46,17 @@ class EmailSender:
                 attachs = [attachs]
 
             for attach_name, attach_io in attachs:
-                attachment = MIMEText(attach_io.getvalue(), 'base64', mail_charset)
-                attachment['Content-Type'] = Header('application/octet-stream')
+                attachment = MIMEApplication(attach_io.getvalue(),
+                                             'vnd.openxmlformats-officedocument.spreadsheetml.sheet')
                 # att_tmp['Content-Disposition'] = f'attachment; filename="{attach_name}"' # 纯英文可用
                 attachment.add_header('Content-Disposition', 'attachment', filename=(mail_charset, '', attach_name))
                 message.attach(attachment)
 
         # message['Subject'] = subject # 纯英文可用
         message['Subject'] = Header(subject, charset=mail_charset).encode()
-        message['From'] = from_addr
+        message['From'] = f'Ticket System<{from_addr}>'
         message['To'] = ';'.join(to_addrs)
-        message['Bcc'] = ";".join([from_addr])
+        # message['Bcc'] = ";".join([from_addr])
 
         try:
             to_server_set = set([to_addr.split('@')[1] for to_addr in to_addrs])

@@ -21,7 +21,6 @@ import openpyxl
 from openpyxl.styles import Border, Side, Alignment, Font
 from openpyxl.utils import get_column_letter
 
-from model import Email
 from u_email import EmailSender
 from unit import date_month_start, date_month_end
 
@@ -57,13 +56,6 @@ def date_show(date, fmt):
     return datetime.strptime(date, "%Y-%m-%d").strftime(fmt)
 
 
-def msg(final_url):
-    return f'''
-    <p><b>尊敬的用户，您好！</b></p>
-    <p>您于{datetime.now().strftime("%Y-%m-%d %H:%M")}导出了《{self._email_attach}》。 <br> 附件为您本次申请导出的报表。</p> 
-'''
-
-
 class ReportBase:
     sender: EmailSender = None
     db = None
@@ -81,10 +73,7 @@ class ReportBase:
 
     @property
     def _mail_msg(self):
-        return f'''
-<p><b>尊敬的用户，您好！</b></p>
-<p>您于{datetime.now().strftime("%Y-%m-%d %H:%M")}导出了《{self._email_attach}》。 <br> 附件为您本次申请导出的报表。</p> 
-'''
+        return f'''您好，附件为您本次申请导出的{self._email_attach}。'''
 
     async def get_attachs(self):
         return None
