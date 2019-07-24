@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 
 import openpyxl
-from openpyxl.styles import Border, Side, Alignment, Font
+from openpyxl.styles import Border, Side, Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from u_email import EmailSender
@@ -28,7 +28,8 @@ from unit import date_month_start, date_month_end
 def setup_report(app):
     ReportBase.sender = app['email']
     ReportBase.db = app['db']
-    ReportBase.config = app['config']
+    ReportBase.sport_map = app['config'].get('ticket', {}).get('sport', {})
+    ReportBase.state_map = app['config'].get('ticket', {}).get('state', {})
     app['report'] = {
         'ReportBase': ReportBase,
         'ReportCheckLogFlow': ReportCheckLogFlow,
@@ -45,6 +46,15 @@ def style_title(cell):
 
 
 def style_body(cell):
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    cell.border = Border(left=Side(border_style='thin', color='000000'),
+                         right=Side(border_style='thin', color='000000'),
+                         top=Side(border_style='thin', color='000000'),
+                         bottom=Side(border_style='thin', color='000000'))
+
+
+def style_body_warn(cell):
+    cell.fill = PatternFill("solid", fgColor="FFBBBB")
     cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
     cell.border = Border(left=Side(border_style='thin', color='000000'),
                          right=Side(border_style='thin', color='000000'),
@@ -81,6 +91,120 @@ class ReportBase:
     async def send(self, email_addr):
         attachs = await self.get_attachs()
         await self.sender.send(email_addr, self._email_subject, self._mail_msg, attachs)
+
+    async def sheet_day_count(self, sheet, date_start, date_end):
+        sheet.row_dimensions[1].hight = 28.5
+        sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(self.sport_map) + 4)
+        style_title(sheet.cell(1, 1, '票券使用统计表'))
+        # 写入数据列标题
+        now_column = 1
+        sheet.column_dimensions[get_column_letter(now_column)].width = 12
+        style_body(sheet.cell(2, now_column, '日期'))
+        now_column += 1
+        for sport in self.sport_map.values():
+            sheet.column_dimensions[get_column_letter(now_column)].width = 8.38
+            style_body(sheet.cell(2, now_column, sport))
+            now_column += 1
+        sheet.column_dimensions[get_column_letter(now_column)].width = 8.38
+        style_body(sheet.cell(2, now_column, '合计'))
+        now_column += 1
+        sheet.column_dimensions[get_column_letter(now_column)].width = 8.38
+        style_body(sheet.cell(2, now_column, '作废张数'))
+        now_column += 1
+        sheet.column_dimensions[get_column_letter(now_column)].width = 8.38
+        style_body(sheet.cell(2, now_column, '备注'))
+        # 填充数据
+        sport_days = {}
+        cursor = self.db.ticket.find({
+            'expiry_date': {'$gte': date_start, '$lte': date_end}
+        }).sort('expiry_date')
+        date_now = date_end
+        async for ticket_doc in cursor:
+            if date_now != ticket_doc.get('expiry_date', '-'):
+                date_now = ticket_doc.get('expiry_date', '-')
+
+            if date_now not in sport_days:
+                sport_days[date_now] = {'expired': 0}
+                sport_days[date_now].update(zip(self.sport_map.keys(), [0] * len(self.sport_map)))
+
+            if ticket_doc.get('state') == 'verified':
+                sport_days[date_now][ticket_doc.get('class')] += 1
+            else:
+                sport_days[date_now]['expired'] += 1
+
+        for sport_day_i, (sport_day, sports) in enumerate(sport_days.items()):
+            now_row = sport_day_i + 3
+            now_column = 1
+            style_body(sheet.cell(now_row, now_column, sport_day))  # 日期
+            now_column += 1
+            count_all = 0
+            for sport, count in sports.items():
+                if sport == 'expired':
+                    continue
+                style_body(sheet.cell(now_row, now_column, count))  # 运动项目
+                count_all += count
+                now_column += 1
+            style_body(sheet.cell(now_row, now_column, count_all))  # 合计
+            now_column += 1
+            style_body(sheet.cell(now_row, now_column, sports.get('expired', 0)))  # 作废张数
+            now_column += 1
+            note = None
+            if datetime.now().strftime('%Y-%m-%d') == sport_day:
+                note = '今日结束后数据可能会发生变动'
+            style_body(sheet.cell(now_row, now_column, note))  # 备注
+
+    async def sheet_day_dtl(self, sheet, date_start, date_end):
+        sheet.row_dimensions[1].hight = 28.5
+        sheet.merge_cells('A1:G1')
+        style_title(sheet.cell(1, 1, '票券使用明细表'))
+        # 写入报表日期
+        sheet.row_dimensions[2].hight = 28.5
+        sheet.merge_cells('A2:G2')
+        if date_start == date_end:
+            date_text = date_start
+        else:
+            date_text = f'{date_start}至{date_end}'
+        style_title(sheet.cell(2, 1, date_text))
+        # 写入数据列标题
+        for index, (head, width) in enumerate([
+            ('序号', 5),
+            ('部门', 10),
+            ('姓名', 8.5),
+            ('项目', 8.5),
+            ('票券编号', 23),
+            ('领取时间', 23),
+            ('票券状态', 8.5)
+        ]):
+            sheet.column_dimensions[get_column_letter(index + 1)].width = width
+            style_body(sheet.cell(3, index + 1, head))
+        # 填充数据
+        cursor = self.db.ticket.find({
+            'expiry_date': {'$gte': date_start, '$lte': date_end}
+        }).sort('expiry_date')
+        date_now = date_end
+        index = 0
+        offset = 0
+        async for ticket_doc in cursor:
+            now_row = index + offset + 4
+            if date_now != ticket_doc.get('expiry_date', '-'):
+                date_now = ticket_doc.get('expiry_date', '-')
+                sheet.merge_cells(start_row=now_row, start_column=1, end_row=now_row, end_column=7)
+                style_body(sheet.cell(now_row, 1, date_now))  # 序号
+                offset += 1
+                now_row = index + offset + 4
+            user = await self.db.user.find_one({'_id': ticket_doc['purchaser']})
+            user_init = await self.db.user_init.find_one({'_id': (user or {}).get('init_id')})
+            style_body(sheet.cell(now_row, 1, index + 1))  # 序号
+            style_body(sheet.cell(now_row, 2, (user_init or {}).get('department', '-')))  # 部门
+            style_body(sheet.cell(now_row, 3, (user_init or {}).get('real_name', '-')))  # 姓名
+            style_body(sheet.cell(now_row, 4, self.sport_map.get(ticket_doc.get('class'), '-')))  # 项目
+            style_body(sheet.cell(now_row, 5, str(ticket_doc.get('_id', '-'))[:20]))  # 票券编号
+            style_body(sheet.cell(now_row, 6, ticket_doc.get('purch_time', '-')))  # 领取时间
+            style_body(sheet.cell(now_row, 7, self.state_map.get(ticket_doc.get('state'), '-')))  # 票券状态
+            index += 1
+        else:
+            return 0
+        return index
 
 
 class ReportCheckLogFlow(ReportBase):
@@ -157,55 +281,7 @@ class ReportUsedDtl(ReportBase):
         # 创建一个sheet对象
         sheet = wb.active
         # 写入报表标题
-        sheet.row_dimensions[1].hight = 28.5
-        sheet.merge_cells('A1:G1')
-        style_title(sheet.cell(1, 1, self._email_subject))
-        # 写入报表日期
-        sheet.row_dimensions[2].hight = 28.5
-        sheet.merge_cells('A2:G2')
-        if self.date_start == self.date_end:
-            date_text = self.date_start
-        else:
-            date_text = f'{self.date_start}至{self.date_end}'
-        style_title(sheet.cell(2, 1, date_text))
-        # 写入数据列标题
-        for index, (head, width) in enumerate([
-            ('序号', 5),
-            ('部门', 10),
-            ('姓名', 8.5),
-            ('项目', 8.5),
-            ('票券编号', 23),
-            ('领取时间', 23),
-            ('票券状态', 8.5)
-        ]):
-            sheet.column_dimensions[get_column_letter(index + 1)].width = width
-            style_body(sheet.cell(3, index + 1, head))
-        # 填充数据
-        cursor = self.db.ticket.find({
-            'expiry_date': {'$gte': self.date_start, '$lte': self.date_end}
-        }).sort('expiry_date')
-        date_now = self.date_end
-        index = 0
-        offset = 0
-        async for ticket_doc in cursor:
-            now_row = index + offset + 4
-            if date_now != ticket_doc.get('expiry_date', '-'):
-                date_now = ticket_doc.get('expiry_date', '-')
-                sheet.merge_cells(start_row=now_row, start_column=1, end_row=now_row, end_column=7)
-                style_body(sheet.cell(now_row, 1, date_now))  # 序号
-                offset += 1
-                now_row = index + offset + 4
-            user = await self.db.user.find_one({'_id': ticket_doc['purchaser']})
-            user_init = await self.db.user_init.find_one({'_id': (user or {}).get('init_id')})
-            style_body(sheet.cell(now_row, 1, index + 1))  # 序号
-            style_body(sheet.cell(now_row, 2, (user_init or {}).get('department', '-')))  # 部门
-            style_body(sheet.cell(now_row, 3, (user_init or {}).get('real_name', '-')))  # 姓名
-            style_body(sheet.cell(now_row, 4, self.sport_map.get(ticket_doc.get('class'), '-')))  # 项目
-            style_body(sheet.cell(now_row, 5, str(ticket_doc.get('_id', '-'))[:20]))  # 票券编号
-            style_body(sheet.cell(now_row, 6, ticket_doc.get('purch_time', '-')))  # 领取时间
-            style_body(sheet.cell(now_row, 7, self.state_map.get(ticket_doc.get('state'), '-')))  # 票券状态
-            index += 1
-
+        await self.sheet_day_dtl(sheet, self.date_start, self.date_end)
         # 写出到IO
         output = BytesIO()
         wb.save(output)
@@ -214,7 +290,7 @@ class ReportUsedDtl(ReportBase):
 
 
 class ReportUsedDay(ReportBase):
-    _email_subject = '领用登记日报表'
+    _email_subject = '票券使用统计日报表'
     date_start = None
     date_end = None
 
@@ -233,67 +309,11 @@ class ReportUsedDay(ReportBase):
         wb = openpyxl.Workbook()
         # 创建一个sheet对象
         sheet = wb.active
+        sheet.title = '统计'
         # 写入报表标题
-        sheet.row_dimensions[1].hight = 28.5
-        sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(self.sport_map) + 4)
-        style_title(sheet.cell(1, 1, self._email_subject))
-        # 写入数据列标题
-        column = 1
-        sheet.column_dimensions[get_column_letter(column)].width = 12
-        style_body(sheet.cell(2, column, '日期'))
-        column += 1
-        for sport in self.sport_map.values():
-            sheet.column_dimensions[get_column_letter(column)].width = 8.38
-            style_body(sheet.cell(2, column, sport))
-            column += 1
-        sheet.column_dimensions[get_column_letter(column)].width = 8.38
-        style_body(sheet.cell(2, column, '合计'))
-        column += 1
-        sheet.column_dimensions[get_column_letter(column)].width = 8.38
-        style_body(sheet.cell(2, column, '作废张数'))
-        column += 1
-        sheet.column_dimensions[get_column_letter(column)].width = 8.38
-        style_body(sheet.cell(2, column, '备注'))
-        # 填充数据
-        sport_days = {}
-        cursor = self.db.ticket.find({
-            'expiry_date': {'$gte': self.date_start, '$lte': self.date_end}
-        }).sort('expiry_date')
-        date_now = self.date_end
-        async for ticket_doc in cursor:
-            if date_now != ticket_doc.get('expiry_date', '-'):
-                date_now = ticket_doc.get('expiry_date', '-')
-
-            if date_now not in sport_days:
-                sport_days[date_now] = {'expired': 0}
-                sport_days[date_now].update(zip(self.sport_map.keys(), [0] * len(self.sport_map)))
-
-            if ticket_doc.get('state') == 'verified':
-                sport_days[date_now][ticket_doc.get('class')] += 1
-            else:
-                sport_days[date_now]['expired'] += 1
-
-        for sport_day_i, (sport_day, sports) in enumerate(sport_days.items()):
-            now_row = sport_day_i + 3
-            column = 1
-            style_body(sheet.cell(now_row, column, sport_day))  # 日期
-            column += 1
-            count_all = 0
-            for sport, count in sports.items():
-                if sport == 'expired':
-                    continue
-                style_body(sheet.cell(now_row, column, count))  # 运动项目
-                count_all += count
-                column += 1
-            style_body(sheet.cell(now_row, column, count_all))  # 合计
-            column += 1
-            style_body(sheet.cell(now_row, column, sports.get('expired', 0)))  # 作废张数
-            column += 1
-            note = None
-            if datetime.now().strftime('%Y-%m-%d') == sport_day:
-                note = '今日结束后数据可能会发生变动'
-            style_body(sheet.cell(now_row, column, note))  # 备注
-
+        await self.sheet_day_count(sheet, self.date_start, self.date_end)
+        sheet = wb.create_sheet(self.date_start)
+        await self.sheet_day_dtl(sheet, self.date_start, self.date_end)
         # 写出到IO
         output = BytesIO()
         wb.save(output)
@@ -302,7 +322,7 @@ class ReportUsedDay(ReportBase):
 
 
 class ReportUsedMonth(ReportBase):
-    _email_subject = '领用登记月报表'
+    _email_subject = '票券使用统计月度报表'
     date_start = None
     date_end = None
 
@@ -317,34 +337,8 @@ class ReportUsedMonth(ReportBase):
         )
 
     async def get_attachs(self):
-        # 创建一个文件对象
-        wb = openpyxl.Workbook()
-        # 创建一个sheet对象
-        sheet = wb.active
-        # 写入报表标题
-        sheet.row_dimensions[1].hight = 28.5
-        sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(self.sport_map) + 5)
-        style_title(sheet.cell(1, 1, self._email_subject))
-        # 写入数据列标题
-        column = 1
-        sheet.column_dimensions[get_column_letter(column)].width = 8.38
-        style_body(sheet.cell(2, column, '年度'))
-        column += 1
-        sheet.column_dimensions[get_column_letter(column)].width = 8.38
-        style_body(sheet.cell(2, column, '月份'))
-        column += 1
-        for sport in self.sport_map.values():
-            sheet.column_dimensions[get_column_letter(column)].width = 8.38
-            style_body(sheet.cell(2, column, sport))
-            column += 1
-        sheet.column_dimensions[get_column_letter(column)].width = 8.38
-        style_body(sheet.cell(2, column, '合计'))
-        column += 1
-        sheet.column_dimensions[get_column_letter(column)].width = 8.38
-        style_body(sheet.cell(2, column, '作废张数'))
-        column += 1
-        sheet.column_dimensions[get_column_letter(column)].width = 8.38
-        style_body(sheet.cell(2, column, '备注'))
+        other = 5
+
         # 填充数据
         date_start = datetime.strptime(self.date_start, '%Y-%m-%d')
         date_end = datetime.strptime(self.date_end, '%Y-%m-%d')
@@ -355,7 +349,10 @@ class ReportUsedMonth(ReportBase):
             month_now += timedelta(days=30)
             month_now += timedelta(days=15 - month_now.day)
             month_list.append(month_now)
-        sport_months = {}
+        sport_months = []
+        sport_all = {
+            'sports': dict(zip(self.sport_map.keys(), [0] * len(self.sport_map)))
+        }
         for month in month_list:
             month_start = date_month_start(month)
             month_end = date_month_end(month)
@@ -365,44 +362,88 @@ class ReportUsedMonth(ReportBase):
             month_start_str = month_start.strftime('%Y-%m-%d')
             month_end_str = month_end.strftime('%Y-%m-%d')
             month_str = month.strftime('%Y-%m')
-
+            sport_month = {'month': month_str, 'start': month_start_str, 'end': month_end_str}
             if month_str not in sport_months:
-                sport_months[month_str] = {'expired': 0}
-                sport_months[month_str].update(zip(self.sport_map.keys(), [0] * len(self.sport_map)))
+                sport_month['sports'] = dict(zip(self.sport_map.keys(), [0] * len(self.sport_map)))
             if datetime.now() <= month_end:
-                sport_months[month_str]['un-end'] = True
-
+                sport_month['un-end'] = True
             cursor = self.db.ticket.find({
                 'expiry_date': {'$gte': month_start_str, '$lte': month_end_str}
             }).sort('expiry_date')
             async for ticket_doc in cursor:
                 if ticket_doc.get('state') == 'verified':
-                    sport_months[month_str][ticket_doc.get('class')] += 1
-                else:
-                    sport_months[month_str]['expired'] += 1
-        for sport_month_i, (month_str, sports) in enumerate(sport_months.items()):
-            year, month = month_str.split('-')
-            now_row = sport_month_i + 3
-            column = 1
-            style_body(sheet.cell(now_row, column, year))  # 年度
-            column += 1
-            style_body(sheet.cell(now_row, column, month))  # 月份
-            column += 1
+                    sport_month['sports'][ticket_doc.get('class')] += 1
+                    sport_all['sports'][ticket_doc.get('class')] += 1
+            sport_months.append(sport_month)
+
+        # 创建一个文件对象
+        wb = openpyxl.Workbook()
+        # 创建一个sheet对象
+        sheet = wb.active
+        # 写入报表标题
+        now_row = 1
+        sheet.row_dimensions[now_row].hight = 28.5
+        sheet.merge_cells(start_row=now_row, start_column=1, end_row=now_row, end_column=len(self.sport_map) + other)
+        style_title(sheet.cell(now_row, 1, self._email_subject))
+        now_row += 1
+        sheet.row_dimensions[now_row].hight = 28.5
+        sheet.merge_cells(start_row=now_row, start_column=1, end_row=now_row, end_column=len(self.sport_map) + other)
+        sheet.cell(now_row, 1, f'导出时间：{datetime.now().strftime("%Y-%m-%d %H:%M")}')
+        now_row += 1
+        # 写入数据列标题
+        now_column = 1
+        for text, width in [('年度', 5), ('月份', 5), ('开始日期', 11), ('结束日期', 11)]:
+            sheet.column_dimensions[get_column_letter(now_column)].width = width
+            style_body(sheet.cell(now_row, now_column, text))
+            now_column += 1
+        for sport in self.sport_map.values():
+            sheet.column_dimensions[get_column_letter(now_column)].width = 7
+            style_body(sheet.cell(now_row, now_column, sport))
+            now_column += 1
+        for text, width in [('合计', 7)]:
+            sheet.column_dimensions[get_column_letter(now_column)].width = width
+            style_body(sheet.cell(now_row, now_column, text))
+            now_column += 1
+        now_row += 1
+        # 写入内容数据
+        for sport_month_i, sport_month in enumerate(sport_months):
+            body = style_body_warn if sport_month.get('un-end') else style_body
+            year, month = sport_month['month'].split('-')
+            now_column = 1
+            body(sheet.cell(now_row, now_column, year))  # 年度
+            now_column += 1
+            body(sheet.cell(now_row, now_column, month))  # 月份
+            now_column += 1
+            body(sheet.cell(now_row, now_column, sport_month['start']))  # 开始日期
+            now_column += 1
+            body(sheet.cell(now_row, now_column, sport_month['end']))  # 结束日期
+            now_column += 1
             count_all = 0
-            for sport, count in sports.items():
+            for sport, count in sport_month['sports'].items():
                 if sport == 'expired' or sport == 'un-end':
                     continue
-                style_body(sheet.cell(now_row, column, count))  # 运动项目
+                body(sheet.cell(now_row, now_column, count))  # 运动项目
                 count_all += count
-                column += 1
-            style_body(sheet.cell(now_row, column, count_all))  # 合计
-            column += 1
-            style_body(sheet.cell(now_row, column, sports.get('expired', 0)))  # 作废张数
-            column += 1
-            note = None
-            if sports.get('un-end'):
-                note = '本月结束后数据可能会发生变动'
-            style_body(sheet.cell(now_row, column, note))  # 备注
+                now_column += 1
+            body(sheet.cell(now_row, now_column, count_all))  # 合计
+            now_row += 1
+        # 写入合计
+        sheet.merge_cells(start_row=now_row, start_column=1, end_row=now_row, end_column=4)
+        now_column = 1
+        style_body(sheet.cell(now_row, now_column, '合计'))  # 合计
+        now_column += 1
+        style_body(sheet.cell(now_row, now_column))  # 合计
+        now_column += 1
+        style_body(sheet.cell(now_row, now_column))  # 合计
+        now_column += 1
+        style_body(sheet.cell(now_row, now_column))  # 合计
+        now_column += 1
+        count_all = 0
+        for sport, count in sport_all['sports'].items():
+            style_body(sheet.cell(now_row, now_column, count))  # 运动项目
+            count_all += count
+            now_column += 1
+        style_body(sheet.cell(now_row, now_column, count_all))  # 合计
 
         # 写出到IO
         output = BytesIO()
