@@ -13,7 +13,7 @@ from email.mime.text import MIMEText
 import dns.resolver
 
 mail_charset = None
-mail_server = 'system@sge-tech.com'
+server_email = 'system@sge-tech.com'
 
 
 def setup_email(app):
@@ -28,12 +28,12 @@ def setup_email(app):
 
 class EmailSender:
     @staticmethod
-    async def send(to_addrs, subject, mail_msg, attachs=None):
-        logging.debug(('邮件收件人：', to_addrs))
-        logging.debug((to_addrs, subject, mail_msg, attachs))
-        from_addr = mail_server
-        if isinstance(to_addrs, str):
-            to_addrs = [to_addrs]
+    async def send(to_emails, subject, mail_msg, attachs=None):
+        logging.debug(('邮件收件人：', to_emails))
+        logging.debug((to_emails, subject, mail_msg, attachs))
+        from_email = server_email
+        if isinstance(to_emails, str):
+            to_emails = [to_emails]
 
         if attachs is None:
             message = MIMEText(mail_msg, _subtype='html', _charset=mail_charset)
@@ -54,23 +54,23 @@ class EmailSender:
 
         # message['Subject'] = subject # 纯英文可用
         message['Subject'] = Header(subject, charset=mail_charset).encode()
-        message['From'] = f'Ticket System<{from_addr}>'
-        message['To'] = ';'.join(to_addrs)
+        message['From'] = f'Ticket System<{from_email}>'
+        message['To'] = ';'.join(to_emails)
         # message['Bcc'] = ";".join([from_addr])
 
         try:
-            to_server_set = set([to_addr.split('@')[1] for to_addr in to_addrs])
-            for to_server in to_server_set:
+            to_domain_set = set([to_email.split('@')[1] for to_email in to_emails])
+            for to_domain in to_domain_set:
                 try:
-                    with SmtpServer(to_server) as smtp_server:
-                        send_errs = smtp_server.send_message(message, from_addr, to_addrs)
+                    with SmtpServer(to_domain) as smtp_server:
+                        send_errs = smtp_server.send_message(message, from_email, to_emails)
                         if not send_errs:
-                            logging.debug(f'邮件投递到{to_server}成功')
+                            logging.debug(f'邮件投递到{to_domain}成功')
                         else:
-                            logging.error(f'邮件投递到{to_server}失败')
+                            logging.error(f'邮件投递到{to_domain}失败')
                             logging.error(send_errs)
                 except dns.resolver.NoAnswer:
-                    logging.error(f'服务器 {to_server} MX 记录解析失败')
+                    logging.error(f'服务器 {to_domain} MX 记录解析失败')
         except smtplib.SMTPDataError as err:
             logging.error(f'邮件投递失败')
             logging.exception(err)
@@ -82,10 +82,10 @@ class EmailSender:
 
 
 class SmtpServer:
-    def __init__(self, server):
-        mx = dns.resolver.query(server, 'MX')
-        email_server = mx[0].exchange.to_text()
-        _server = smtplib.SMTP(email_server)
+    def __init__(self, domain):
+        mx = dns.resolver.query(domain, 'MX')
+        server_addr = mx[0].exchange.to_text()
+        _server = smtplib.SMTP(server_addr)
         self.server = _server
 
     def __enter__(self):
