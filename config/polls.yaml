@@ -10,36 +10,6 @@ database:
 email:
   charset: 'gbk'
   servers:
-    - # sina 每天限制30封邮件
-      host: smtp.sina.com
-      port: 25
-      user: sge_notify@sina.com
-      pass: Sge20021030
-      limit: 30
-    - # sohu 每天限制100封邮件
-      host: smtp.sohu.com
-      port: 25
-      user: sge_notify@sohu.com
-      pass: Sge20021030
-      limit: 100
-    - # yeah 每天限制50封邮件
-      host: smtp.yeah.net
-      port: 25
-      user: sge_notify@yeah.net
-      pass: Sge2002
-      limit: 50
-    - # 163 每天限制50封邮件
-      host: smtp.163.com
-      port: 25
-      user: sge_notify@163.com
-      pass: Sge2002
-      limit: 50
-    - # 126 每天限制50封邮件
-      host: smtp.126.com
-      port: 25
-      user: sge_notify@126.com
-      pass: Sge2002
-      limit: 50
 ticket:
   sport:
     badminton: 羽毛球
