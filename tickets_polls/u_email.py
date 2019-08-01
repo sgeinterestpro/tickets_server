@@ -85,6 +85,7 @@ class SmtpServer:
     def __init__(self, domain):
         mx = dns.resolver.query(domain, 'MX')
         server_addr = mx[0].exchange.to_text()
+        logging.debug(f'目标邮件服务器：{server_addr}')
         _server = smtplib.SMTP(server_addr)
         self.server = _server
 
