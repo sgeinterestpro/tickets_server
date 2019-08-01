@@ -32,12 +32,5 @@ def config_database(app, uri):
         pass
     db.captcha.create_index('expire_time', expireAfterSeconds=600)
 
-    mail_servers = app['config']['email']['servers']
-    for server in mail_servers:
-        server['limit'] = int(server['limit'])
-        server['port'] = int(server['port'])
-        db.email.find_one_and_replace({
-            'user': server['user']
-        }, server, upsert=True)
     client.close()
     pass
