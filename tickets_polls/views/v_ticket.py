@@ -37,6 +37,8 @@ class TicketHandles:
             ticket = Ticket(**ticket_doc)
             if ticket['state'] == 'valid' and date_now > ticket['expiry_date']:
                 ticket['state'] = 'expired'
+            if ticket['state'] == 'delete':
+                continue
             items.append(ticket.to_json())
             count += 1
 
@@ -125,17 +127,23 @@ class TicketHandles:
         if date_now > ticket['expiry_date']:
             return web.json_response({'code': -1, 'message': '无法删除已过期票券'})
 
+        # 检查本周删除限额
+        count = await db.ticket.count_documents({
+            'deleter': user.mongo_id,
+            'delete_time': {'$gte': date_week_start(), '$lte': date_week_end()}
+        })
+        if count >= 3:
+            return web.json_response({'code': -1, 'message': '已超过本周最大删除数量'})
+
         res = await db.ticket.update_one({
             '_id': data['ticket_id'],
             'state': 'valid',
             'purchaser': user.mongo_id
         }, {
             '$set': {
-                'class': None,
-                'state': 'default',
-                'purchaser': None,
-                'purch_time': None,
-                'expiry_date': None
+                'state': 'delete',
+                'deleter': user.mongo_id,
+                'delete_time': datetime.now(),
             }
         })
 
@@ -290,34 +298,20 @@ class TicketHandles:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
 
         this_month_start = date_month_start().strftime('%Y-%m-%d')
-        this_date_now = datetime.now().strftime('%Y-%m-%d')
-        default_count = await db.ticket.count_documents({
-            'state': 'default',
-        })
-        valid_count = await db.ticket.count_documents({
-            'state': 'valid',
-            'expiry_date': {'$gte': this_month_start}
-        })
-        verified_count = await db.ticket.count_documents({
-            'state': 'verified',
-            'expiry_date': {'$gte': this_month_start}
-        })
-        expired_count = await db.ticket.count_documents({
-            'state': 'expired',
-            'expiry_date': {'$gte': this_month_start}
-        })
-        invalid_count = await db.ticket.count_documents({
-            'state': 'invalid',
-            'expiry_date': {'$gte': this_month_start}
-        })
-        return web.json_response({'code': 0, 'message': '获取票券数量信息成功', 'data': {
-            'default': default_count,
-            'active': valid_count + verified_count + expired_count + invalid_count,
-            'valid': valid_count,
-            'verified': verified_count,
-            'expired': expired_count,
-            'invalid': invalid_count
-        }})
+        state_map = request.app['config'].get('ticket', {}).get('state', {})
+        data = {}
+        for state in state_map.keys():
+            if state == 'default':
+                count = await db.ticket.count_documents({
+                    'state': state,
+                })
+            else:
+                count = await db.ticket.count_documents({
+                    'state': state,
+                    'expiry_date': {'$gte': this_month_start}
+                })
+            data[state] = count
+        return web.json_response({'code': 0, 'message': '获取票券数量信息成功', 'data': data})
 
     @staticmethod
     async def ticket_log(request):
@@ -330,7 +324,7 @@ class TicketHandles:
 
         user = await User.find_one(db, {'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one(db, {'_id': user['init_id']})
-        if 'admin' not in user_init['role']:
+        if not user_init or 'admin' not in user_init['role']:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
 
         data = await request.json()

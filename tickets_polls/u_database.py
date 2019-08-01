@@ -26,6 +26,8 @@ def config_database(app, uri):
     db = client.get_database('ticket')
     # db.captcha.create_index('expire_time', expireAfterSeconds=3600)
     # noinspection PyBroadException
+
+    # 设置验证码表数据过期时间
     try:
         db.captcha.drop_index('expire_time_1')
     except Exception:

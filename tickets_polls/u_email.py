@@ -3,6 +3,7 @@ filename: u_email.py
 datetime: 2019-07-08
 author: muumlover
 """
+import base64
 import logging
 import smtplib
 from email.header import Header
@@ -46,10 +47,15 @@ class EmailSender:
                 attachs = [attachs]
 
             for attach_name, attach_io in attachs:
-                attachment = MIMEApplication(attach_io.getvalue(),
-                                             'vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                # att_tmp['Content-Disposition'] = f'attachment; filename="{attach_name}"' # 纯英文可用
-                attachment.add_header('Content-Disposition', 'attachment', filename=(mail_charset, '', attach_name))
+                attachment = MIMEApplication(
+                    attach_io.getvalue(), 'vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                # 纯英文可用
+                # attachment['Content-Disposition'] = f'attachment; filename="{attach_name}"'
+                # 兼容性不好
+                # attachment.add_header('Content-Disposition', 'attachment', filename=(mail_charset, '', attach_name))
+                # 模拟
+                filename = f'=?{mail_charset}?B?{base64.b64encode(attach_name.encode(mail_charset)).decode()}?='
+                attachment.add_header('Content-Disposition', 'attachment', filename=filename)
                 message.attach(attachment)
 
         # message['Subject'] = subject # 纯英文可用

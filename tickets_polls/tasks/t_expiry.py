@@ -8,6 +8,7 @@ from datetime import datetime
 
 
 async def expiry(app):
+    logging.info(f'开始处理过期票券')
     db = app['db']
     date_now = datetime.now().strftime('%Y-%m-%d')
     res = await db.ticket.update_many({

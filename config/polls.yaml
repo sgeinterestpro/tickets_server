@@ -18,6 +18,8 @@ ticket:
     swim: 游泳
     yoga: 瑜伽
   state:
-    valid: 未使用
-    expired: 已过期
+    default: 库存
+    valid: 已领出
     verified: 已使用
+    expired: 已过期
+    delete: 已删除
