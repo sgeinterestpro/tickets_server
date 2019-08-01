@@ -83,8 +83,15 @@ class Model:
 
 class Ticket(Model):
     collection_name = 'ticket'
-    fled_list = ['class', 'state', 'raiser', 'raise_time', 'purchaser', 'purch_time', 'expiry_date', 'overdue_time',
-                 'checker', 'check_time']
+    fled_list = [
+        'class',
+        'state',
+        'expiry_date',
+        'raiser', 'raise_time',
+        'purchaser', 'purch_time',
+        'checker', 'check_time',
+        'deleter', 'delete_time',
+        'overdue_time']
     fled_default = {
         'state': 'default'
     }

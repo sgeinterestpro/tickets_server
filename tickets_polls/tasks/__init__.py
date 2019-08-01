@@ -34,4 +34,6 @@
 #                   '$               $
 #                    $               $
 
+from .t_check import *
 from .t_expiry import *
+from .t_notice import *
