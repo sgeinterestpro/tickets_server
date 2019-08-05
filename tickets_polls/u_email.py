@@ -14,7 +14,7 @@ from email.mime.text import MIMEText
 import dns.resolver
 
 charset = None
-sender = 'noreply@sge-tech.com'
+sender = None
 
 
 def setup_email(app):
@@ -23,8 +23,8 @@ def setup_email(app):
     global charset
     charset = app['config']['email']['charset']
 
-    global servers
-    servers = app['config']['email']['servers']
+    global sender
+    sender = app['config']['email']['sender']
 
 
 def rfc2047(s, charset='utf-8', language=None):

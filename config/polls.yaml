@@ -9,6 +9,7 @@ database:
   pass:
 email:
   charset: 'gbk'
+  sender: 'noreply@sge-tech.com'
   servers:
 ticket:
   sport:
