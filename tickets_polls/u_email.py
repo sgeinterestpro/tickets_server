@@ -13,63 +13,67 @@ from email.mime.text import MIMEText
 
 import dns.resolver
 
-mail_charset = None
-server_email = 'system@sge-tech.com'
+charset = None
+sender = 'system@sge-tech.com'
 
 
 def setup_email(app):
     app['email'] = EmailSender
 
-    global mail_charset
-    mail_charset = app['config']['email']['charset']
+    global charset
+    charset = app['config']['email']['charset']
 
-    global mail_servers
-    mail_servers = app['config']['email']['servers']
+    global servers
+    servers = app['config']['email']['servers']
+
+
+def rfc2047(s, charset='utf-8', language=None):
+    """Encode string according to RFC 2231.
+    """
+    s = base64.b64encode(s.encode(charset)).decode()
+    return "=?%s?b?%s?=" % (charset, s)
 
 
 class EmailSender:
     @staticmethod
-    async def send(to_emails, subject, mail_msg, attachs=None):
-        logging.debug(('邮件收件人：', to_emails))
-        logging.debug((to_emails, subject, mail_msg, attachs))
-        from_email = server_email
-        if isinstance(to_emails, str):
-            to_emails = [to_emails]
+    async def send(to_addrs, subject, mail_msg, attachs=None):
+        logging.debug(('邮件收件人：', to_addrs))
+        logging.debug((to_addrs, subject, mail_msg, attachs))
+        from_addr = sender
+        if isinstance(to_addrs, str):
+            to_addrs = [to_addrs]
 
         if attachs is None:
-            message = MIMEText(mail_msg, _subtype='html', _charset=mail_charset)
+            message = MIMEText(mail_msg, _subtype='html', _charset=charset)
         else:
             message = MIMEMultipart()
-            msg_text = MIMEText(mail_msg, _subtype='html', _charset=mail_charset)
+            msg_text = MIMEText(mail_msg, _subtype='html', _charset=charset)
             message.attach(msg_text)
 
             if isinstance(attachs, tuple):
                 attachs = [attachs]
 
-            for attach_name, attach_io in attachs:
-                attachment = MIMEApplication(
-                    attach_io.getvalue(), 'vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                # 纯英文可用
-                # attachment['Content-Disposition'] = f'attachment; filename="{attach_name}"'
-                # 兼容性不好
-                # attachment.add_header('Content-Disposition', 'attachment', filename=(mail_charset, '', attach_name))
-                # 模拟
-                filename = f'=?{mail_charset}?B?{base64.b64encode(attach_name.encode(mail_charset)).decode()}?='
-                attachment.add_header('Content-Disposition', 'attachment', filename=filename)
+            for name, fp in attachs:
+                attachment = MIMEApplication(fp.getvalue(), 'vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                # 纯英文可用，中文乱码
+                # attachment['Content-Disposition'] = f'attachment; filename="{name}"'
+                # 客户端兼容性不好，RFC2231 *= 格式
+                # attachment.add_header('Content-Disposition', 'attachment', filename=(charset, '', name))
+                # RFC2047 规范，使用广泛
+                # filename = f'=?{charset}?B?{base64.b64encode(name.encode(charset)).decode()}?='
+                attachment.add_header('Content-Disposition', 'attachment', filename=rfc2047(name, charset))
                 message.attach(attachment)
 
-        # message['Subject'] = subject # 纯英文可用
-        message['Subject'] = Header(subject, charset=mail_charset).encode()
-        message['From'] = f'Ticket System<{from_email}>'
-        message['To'] = ';'.join(to_emails)
-        # message['Bcc'] = ";".join([from_addr])
+        message['Subject'] = Header(subject, charset=charset).encode()
+        message['From'] = f'{rfc2047("票券管理平台", charset)} <{from_addr}>'
+        message['To'] = ';'.join([f'{rfc2047("票券管理平台用户", charset)} <{to_addr}>' for to_addr in to_addrs])
 
         try:
-            to_domain_set = set([to_email.split('@')[1] for to_email in to_emails])
+            to_domain_set = set([to_addr.split('@')[1] for to_addr in to_addrs])
             for to_domain in to_domain_set:
                 try:
                     with SmtpServer(to_domain) as smtp_server:
-                        send_errs = smtp_server.send_message(message, from_email, to_emails)
+                        send_errs = smtp_server.send_message(message, from_addr, to_addrs)
                         if not send_errs:
                             logging.debug(f'邮件投递到{to_domain}成功')
                         else:
@@ -114,8 +118,8 @@ if __name__ == '__main__':
     from config import load_config
 
     conf = load_config(str(pathlib.Path('..') / 'config' / 'polls.yaml'))
-    mail_charset = conf['email']['charset']
-    mail_servers = conf['email']['servers']
+    charset = conf['email']['charset']
+    servers = conf['email']['servers']
 
     import xlwt
     from io import BytesIO
