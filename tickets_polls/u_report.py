@@ -99,8 +99,6 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
         </div> 
     </div> 
 </div>
-<p><b>尊敬的用户，您好！</b></p>
-<p>您于{datetime.now().strftime("%Y-%m-%d %H:%M")}导出了《{self._email_attach}》。 <br> 附件为您本次申请导出的报表。</p> 
 '''
 
     async def get_attachs(self):

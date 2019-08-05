@@ -32,7 +32,7 @@ async def notice(app):
     if count == 0:
         logging.info(f'上一个自然日期{last_date}未产生数据')
         return
-    report = ReportUsedDtl(last_date)
+    report = ReportUsedDtl(last_date, None)
     cursor = db.user_init.find({
         'role': 'admin'
     })
