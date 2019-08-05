@@ -13,18 +13,11 @@ from email.mime.text import MIMEText
 
 import dns.resolver
 
-charset = None
-sender = None
-
 
 def setup_email(app):
+    EmailSender.charset = app['config']['email']['charset']
+    EmailSender.sender = app['config']['email']['sender']
     app['email'] = EmailSender
-
-    global charset
-    charset = app['config']['email']['charset']
-
-    global sender
-    sender = app['config']['email']['sender']
 
 
 def rfc2047(s, charset='utf-8', language=None):
@@ -35,11 +28,16 @@ def rfc2047(s, charset='utf-8', language=None):
 
 
 class EmailSender:
+    charset = None
+    sender = None
+
     @staticmethod
     async def send(to_addrs, subject, mail_msg, attachs=None):
         logging.debug(('邮件收件人：', to_addrs))
         logging.debug((to_addrs, subject, mail_msg, attachs))
-        from_addr = sender
+
+        charset = EmailSender.charset
+        from_addr = EmailSender.sender
         if isinstance(to_addrs, str):
             to_addrs = [to_addrs]
 
@@ -118,8 +116,8 @@ if __name__ == '__main__':
     from config import load_config
 
     conf = load_config(str(pathlib.Path('..') / 'config' / 'polls.yaml'))
-    charset = conf['email']['charset']
-    servers = conf['email']['servers']
+    EmailSender.charset = conf['email']['charset']
+    EmailSender.servers = conf['email']['servers']
 
     import xlwt
     from io import BytesIO
