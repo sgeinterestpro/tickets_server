@@ -14,7 +14,7 @@ from email.mime.text import MIMEText
 import dns.resolver
 
 charset = None
-sender = 'system@sge-tech.com'
+sender = 'noreply@sge-tech.com'
 
 
 def setup_email(app):
