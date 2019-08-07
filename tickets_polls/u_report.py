@@ -22,7 +22,7 @@ from openpyxl.styles import Border, Side, Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from u_email import EmailSender
-from unit import date_month_start, date_month_end
+from unit import date_month_start, date_month_end, date_show
 
 
 def setup_report(app):
@@ -60,10 +60,6 @@ def style_body_warn(cell):
                          right=Side(border_style='thin', color='000000'),
                          top=Side(border_style='thin', color='000000'),
                          bottom=Side(border_style='thin', color='000000'))
-
-
-def date_show(date, fmt):
-    return datetime.strptime(date, "%Y-%m-%d").strftime(fmt)
 
 
 class ReportBase:
@@ -171,6 +167,8 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
             if datetime.now().strftime('%Y-%m-%d') == sport_day:
                 note = '今日结束后数据可能会发生变动'
             style_body(sheet.cell(now_row, now_column, note))  # 备注
+            if note:
+                break
 
     async def sheet_day_dtl(self, sheet, date):
         sheet.row_dimensions[1].hight = 28.5

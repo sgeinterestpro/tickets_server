@@ -7,6 +7,10 @@ author: muumlover
 from datetime import timedelta, datetime
 
 
+def date_show(date, fmt):
+    return datetime.strptime(date, "%Y-%m-%d").strftime(fmt)
+
+
 def date_week_start(date=None):
     """
     给定日期所在结算周的第一天
