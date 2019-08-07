@@ -64,7 +64,12 @@ class EmailSender:
 
         message['Subject'] = Header(subject, charset=charset).encode()
         message['From'] = f'{rfc2047("票券管理平台", charset)} <{from_addr}>'
-        message['To'] = ';'.join([f'{rfc2047("票券管理平台用户", charset)} <{to_addr}>' for to_addr in to_addrs])
+        message['To'] = ';'.join([f'{rfc2047("平台用户", charset)} <{to_addr}>' for to_addr in to_addrs])
+
+        # with open('send_email.eml', 'wb') as fd:
+        #     logging.debug('邮件已经保存到本地文件')
+        #     fd.write(message.as_bytes())
+        #     return
 
         try:
             to_domain_set = set([to_addr.split('@')[1] for to_addr in to_addrs])
