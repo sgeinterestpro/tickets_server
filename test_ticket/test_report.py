@@ -1,10 +1,10 @@
 import os
 import unittest
 
+import openpyxl
+
 from test_ticket.test_base import TestBase, async_test, date_convert
 from u_report import ReportBase, ReportUsedDay, ReportUsedMonth, ReportUsedDtl
-
-import openpyxl
 
 
 class Report(TestBase):
@@ -50,7 +50,7 @@ class Report(TestBase):
             ReportUsedMonth,
             start_data, end_data,
             f'票券使用统计月度报表_{start_day}-{end_day}.xlsx')
-        os.remove(filename)
+        # os.remove(filename)
 
     @async_test
     async def test_ReportUsedDtl(self):
@@ -60,7 +60,7 @@ class Report(TestBase):
             ReportUsedDtl,
             data, None,
             f'领用登记明细表_{day}.xlsx')
-        os.remove(filename)
+        # os.remove(filename)
 
 
 if __name__ == '__main__':
