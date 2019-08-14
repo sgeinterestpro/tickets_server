@@ -113,7 +113,7 @@ class UserHandles:
     async def user_info(request):
         db = request.app['db']
         user_info = {}
-        user = await User.find_one(db, {'wx_open_id': request['open-id']})
+        user = await User.find_or_insert_one(db, {'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one(db, {'_id': user['init_id']})
         if user_init is not None:
             user_info.update(user_init.to_json())
