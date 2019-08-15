@@ -24,7 +24,7 @@ def setup_config(app):
 
     private_key = rsa.generate_private_key(
         public_exponent=65537,
-        key_size=2048,
+        key_size=1024,
         backend=default_backend()
     )
     public_key = private_key.public_key()
