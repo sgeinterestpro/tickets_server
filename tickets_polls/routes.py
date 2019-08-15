@@ -30,6 +30,8 @@ def setup_routes(app):
 
     app.router.add_route('*', '/report_export', ReportHandles.report_export)
 
+    app.router.add_route('*', '/web/rsa_pub_key', SystemHandles.rsa_pub_key)
+
     app.router.add_route('*', '/web/email_check/{uuid}', WebHandles.email_check, name='email-check')
 
 
