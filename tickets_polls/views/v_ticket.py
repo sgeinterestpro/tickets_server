@@ -3,10 +3,12 @@ filename: v_ticket.py
 datetime: 2019-04-22
 author: muumlover
 """
+import base64
 import uuid
 from datetime import datetime, timedelta
 
 from aiohttp import web
+from cryptography.hazmat.primitives.asymmetric import padding
 
 from model import Ticket, User, UserInit
 from unit import date_week_start, date_week_end, date_month_start
@@ -109,7 +111,7 @@ class TicketHandles:
         user = await User.find_one(db, {'wx_open_id': request['open-id']})
         data = await request.json()
 
-        if 'ticket_id' not in data:
+        if 'ticket_id' not in data or not data['ticket_id']:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
         ticket = await Ticket.find_one(db, {'_id': data['ticket_id']})
@@ -165,8 +167,13 @@ class TicketHandles:
         db = request.app['db']
         data = await request.json()
 
-        if 'ticket_id' not in data:
+        if 'ticket_id' not in data or not data['ticket_id']:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
+
+        # 解密
+        private_key = request.app['private_key']
+        ticket_id_encrypt = base64.b64decode(data['ticket_id'])
+        ticket_id = private_key.decrypt(ticket_id_encrypt, padding.PKCS1v15()).decode()
 
         user = await User.find_one(db, {'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one(db, {'_id': user['init_id']})
@@ -174,7 +181,7 @@ class TicketHandles:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
 
         ticket = await Ticket.find_one(db, {
-            '_id': data['ticket_id'],
+            '_id': ticket_id,
         })
 
         if ticket is None:
@@ -220,8 +227,13 @@ class TicketHandles:
         db = request.app['db']
         data = await request.json()
 
-        if 'ticket_id' not in data:
+        if 'ticket_id' not in data or not data['ticket_id']:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
+
+        # 解密
+        private_key = request.app['private_key']
+        ticket_id_encrypt = base64.b64decode(data['ticket_id'])
+        ticket_id = private_key.decrypt(ticket_id_encrypt, padding.PKCS1v15()).decode()
 
         user = await User.find_one(db, {'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one(db, {'_id': user['init_id']})
@@ -229,7 +241,7 @@ class TicketHandles:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
 
         ticket_doc = await Ticket.find_one(db, {
-            '_id': data['ticket_id'],
+            '_id': ticket_id,
         })
         if ticket_doc is None:
             return web.json_response({'code': -1, 'message': '票券不存在'})
