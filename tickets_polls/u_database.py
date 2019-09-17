@@ -15,15 +15,15 @@ def setup_database(app):
     if conf['database']['user'] != '':
         uri += '{}:{}@'.format(quote_plus(conf['database']['user']), quote_plus(conf['database']['pass']))
     uri += '{}:{}'.format(quote_plus(conf['database']['host']), quote_plus(conf['database']['port']))
-    # uri += '/{}'.format(quote_plus(conf['database']['name']))
+    uri += '/{}'.format(quote_plus(conf['database']['name']))
     client = AsyncIOMotorClient(uri)
-    app['db'] = client.get_database('ticket')
-    config_database(app, uri)
+    app['db'] = client.get_database(quote_plus(conf['database']['name']))
+    config_database(app, uri, quote_plus(conf['database']['name']))
 
 
-def config_database(app, uri):
+def config_database(app, uri, db_name):
     client = MongoClient(uri)
-    db = client.get_database('ticket')
+    db = client.get_database(db_name)
     # db.captcha.create_index('expire_time', expireAfterSeconds=3600)
     # noinspection PyBroadException
 

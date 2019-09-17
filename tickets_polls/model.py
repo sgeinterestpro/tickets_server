@@ -130,8 +130,9 @@ class User(Model):
 class UserInit(Model):
     collection_name = 'user_init'
     fled_list = [
-        'email',
         'real_name',
+        'department',
+        'email',
         'phone',
         'work_no',
         'sports',

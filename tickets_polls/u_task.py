@@ -11,9 +11,9 @@ import tasks
 
 def setup_task(app):
     scheduler = AsyncIOScheduler({
-        'apscheduler.jobstores.mongo': {
-            'type': 'mongodb'
-        }
+        # 'apscheduler.jobstores.mongo': {
+        #     'type': 'mongodb'
+        # }
     })
     scheduler.start()
     app['task'] = scheduler
