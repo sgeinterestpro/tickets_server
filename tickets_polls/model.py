@@ -56,6 +56,8 @@ class Model:
 
     @classmethod
     async def find_one(cls, db, data):
+        if '_id' in data and ObjectId.is_valid(data['_id']):
+            data['_id'] = ObjectId(data['_id'])
         doc = await db[cls.collection_name].find_one(data)
         return cls(**(doc or {}))
 

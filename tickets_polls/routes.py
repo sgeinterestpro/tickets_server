@@ -17,6 +17,8 @@ def setup_routes(app):
     app.router.add_route('*', '/ticket_generate', TicketHandles.ticket_generate)
     app.router.add_route('*', '/ticket_usage', TicketHandles.ticket_usage)
 
+    app.router.add_route('*', '/ticket_sign_in', TicketHandles.ticket_sign_in)
+
     app.router.add_route('*', '/ticket_log', TicketHandles.ticket_log)
     app.router.add_route('*', '/ticket_check_log', TicketHandles.ticket_check_log)
 
