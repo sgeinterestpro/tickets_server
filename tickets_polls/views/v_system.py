@@ -20,7 +20,9 @@ from cryptography.hazmat.primitives import serialization
 class SystemHandles:
     @staticmethod
     async def rsa_pub_key(request):
-        public_pem = request.app['public_key'].public_bytes(
+        private_key = request.app['private_key']
+        public_key = private_key.public_key()
+        public_pem = public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )

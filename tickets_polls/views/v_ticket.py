@@ -28,6 +28,7 @@ class TicketHandles:
         this_week_start = date_week_start().strftime('%Y-%m-%d')
         this_week_end = date_week_end().strftime('%Y-%m-%d')
         cursor = db.ticket.find({
+            'state': {'$ne': 'default'},
             'purchaser': user.mongo_id,
             'expiry_date': {'$gte': this_week_start, '$lte': this_week_end}
         })
@@ -96,6 +97,66 @@ class TicketHandles:
         new_ticket = await Ticket.find_one(db, new_value)
         _ = await db.ticket_log.insert_one(
             {'init_id': user['init_id'], 'option': 'purchase', 'ticket_id': new_ticket.json_id})
+
+        return web.json_response({'code': 0, 'message': '票券领取成功'})
+
+    @staticmethod
+    async def ticket_sign_in(request):
+        """
+        签到打卡
+        :param request:
+        :return:
+        """
+
+        # 解析请求数据
+        data = await request.json()
+        if 'checker_id' not in data or 'class' not in data:
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
+
+        # 加载数据库
+        db = request.app['db']
+
+        # 获取用户信息
+        user = await User.find_one(db, {'wx_open_id': request['open-id']})
+
+        # 检查本周领取限额
+        this_week_start = date_week_start().strftime('%Y-%m-%d')
+        this_week_end = date_week_end().strftime('%Y-%m-%d')
+        count = await db.ticket.count_documents({
+            'purchaser': user.mongo_id,
+            'expiry_date': {'$gte': this_week_start, '$lte': this_week_end}
+        })
+
+        if count >= 3:
+            return web.json_response({'code': -1, 'message': '已超过本周领取限额'})
+
+        # 获取扫描员
+        checker = await User.find_one(db, {'_id': data['checker_id']})
+
+        # 领取票券
+        check_time = datetime.now()
+        new_value = {
+            'class': data['class'],
+            'state': 'verified',
+            'purchaser': user.mongo_id,
+            'purch_time': check_time,
+            'checker': checker.mongo_id,
+            'check_time': check_time,
+            'expiry_date': check_time.strftime('%Y-%m-%d')
+        }
+
+        # 更新票券信息
+        res = await db.ticket.update_one({'state': 'default'}, {'$set': new_value})
+        if res.matched_count == 0:
+            return web.json_response({'code': -1, 'message': '没有可领取的票券'})
+        if res.modified_count == 0:
+            return web.json_response({'code': -3, 'message': '更新票券信息失败'})
+
+        # 生成票券使用记录
+        new_ticket = await Ticket.find_one(db, new_value)
+        _ = await db.ticket_log.insert_one(
+            {'init_id': user['init_id'], 'option': 'purchase', 'ticket_id': new_ticket.json_id}
+        )
 
         return web.json_response({'code': 0, 'message': '票券领取成功'})
 
@@ -384,46 +445,50 @@ class TicketHandles:
             add_fields,
             project
         ]
-        cursor = db.ticket_log.aggregate(pipeline)
+
         count, items = 0, []
-        async for ticket_log_doc in cursor:
-            '''目标数据格式
-            {
-                '_id': ObjectId('5d26e9e17e2fec35dd45fef6'),
-                'user_id': ObjectId('5d25eee4f2a471d041f759b7'), 
-                'option': 'purchase',
-                'ticket_id': 'SGE201907105029500002',
-                'ticket': {
-                    '_id': 'SGE201907105029500002',
-                    'class': 'basketball',
-                    'state': 'expired',
-                    'raiser': ObjectId('5d25eee4f2a471d041f759b7'),
-                    'raise_time': datetime.datetime(2019, 7, 10, 21, 58, 15, 487000),
-                    'purchaser': ObjectId('5d28638806e6e6b2a86bc85e'),
-                    'purch_time': datetime.datetime(2019, 7, 13, 17, 4, 36, 78000),
-                    'expiry_date': '2019-07-13',
-                    'overdue_time': datetime.datetime(2019, 7, 14, 0, 0, 0, 7000), 
-                    'checker': None,
-                    'check_time': None
-                }, 
-                'init': {
-                    '_id': ObjectId('5d281c90e8834258726aa12c'), 
-                    'email': 'zhangsan@qq.com',
-                    'real_name': '张三', 
-                    'phone': '13300330333', 
-                    'work_no': '5433',
-                    'role': ['user', 'admin', 'checker']
+        count_all = await db.ticket_log.count_documents({'ticket_id': {'$ne': None}})
+
+        if count_all > 0:
+            cursor = db.ticket_log.aggregate(pipeline)
+            async for ticket_log_doc in cursor:
+                '''目标数据格式
+                {
+                    '_id': ObjectId('5d26e9e17e2fec35dd45fef6'),
+                    'user_id': ObjectId('5d25eee4f2a471d041f759b7'), 
+                    'option': 'purchase',
+                    'ticket_id': 'SGE201907105029500002',
+                    'ticket': {
+                        '_id': 'SGE201907105029500002',
+                        'class': 'basketball',
+                        'state': 'expired',
+                        'raiser': ObjectId('5d25eee4f2a471d041f759b7'),
+                        'raise_time': datetime.datetime(2019, 7, 10, 21, 58, 15, 487000),
+                        'purchaser': ObjectId('5d28638806e6e6b2a86bc85e'),
+                        'purch_time': datetime.datetime(2019, 7, 13, 17, 4, 36, 78000),
+                        'expiry_date': '2019-07-13',
+                        'overdue_time': datetime.datetime(2019, 7, 14, 0, 0, 0, 7000), 
+                        'checker': None,
+                        'check_time': None
+                    }, 
+                    'init': {
+                        '_id': ObjectId('5d281c90e8834258726aa12c'), 
+                        'email': 'zhangsan@qq.com',
+                        'real_name': '张三', 
+                        'phone': '13300330333', 
+                        'work_no': '5433',
+                        'role': ['user', 'admin', 'checker']
+                    }
                 }
-            }
-            '''
-            items.append({
-                'option': ticket_log_doc.get('option', None),
-                'time': str(ticket_log_doc.get('_id', None).generation_time.astimezone()),
-                'ticket_id': ticket_log_doc.get('ticket_id', None),
-                'ticket_class': ticket_log_doc.get('ticket', {}).get('class', None),
-                'real_name': ticket_log_doc.get('init', {}).get('real_name', None),
-            })
-            count += 1
+                '''
+                items.append({
+                    'option': ticket_log_doc.get('option', None),
+                    'time': str(ticket_log_doc.get('_id', None).generation_time.astimezone()),
+                    'ticket_id': ticket_log_doc.get('ticket_id', None),
+                    'ticket_class': ticket_log_doc.get('ticket', {}).get('class', None),
+                    'real_name': ticket_log_doc.get('init', {}).get('real_name', None),
+                })
+                count += 1
 
         return web.json_response({'code': 0, 'message': '获取票券记录成功', 'count': count, 'items': items})
 
@@ -444,6 +509,10 @@ class TicketHandles:
             date_end = datetime.strptime(end, '%Y-%m-%d') + timedelta(days=1)
         except ValueError:
             return web.json_response({'code': -2, 'message': '日期输入错误'})
+
+        cursor = await db.ticket.count_documents({})
+        if cursor == 0:
+            return web.json_response({'code': 0, 'message': '获取票券使用记录成功', 'count': 0, 'items': []})
 
         match = {'$match': {'check_time': {'$gte': date_start, '$lte': date_end}}}
         # 联合查询用户信息表
@@ -486,24 +555,21 @@ class TicketHandles:
             add_field_real,
             project
         ]
-        cursor = db.ticket.aggregate(pipeline)
-
-        # cursor = db.ticket.find({
-        #     'check_time': {'$gte': date_start, '$lte': date_end}
-        # })
 
         count, items = 0, []
-        # for ticket in await cursor.to_list(length=100):
-        async for ticket_doc in cursor:
-            ticket = Ticket(**ticket_doc)
-            item = ticket.to_json()
-            user = User(**ticket_doc.get('user', {}))
-            if user is not None:
-                item['user'] = user.to_json()
-            user_init = UserInit(**ticket_doc.get('user_init', {}))
-            if user_init is not None:
-                item['user_init'] = user_init.to_json()
-            items.append(item)
-            count += 1
+        count_all = await db.ticket.count_documents({'check_time': {'$gte': date_start, '$lte': date_end}})
+        if count_all > 0:
+            cursor = db.ticket.aggregate(pipeline)
+            async for ticket_doc in cursor:
+                ticket = Ticket(**ticket_doc)
+                item = ticket.to_json()
+                user = User(**ticket_doc.get('user', {}))
+                if user is not None:
+                    item['user'] = user.to_json()
+                user_init = UserInit(**ticket_doc.get('user_init', {}))
+                if user_init is not None:
+                    item['user_init'] = user_init.to_json()
+                items.append(item)
+                count += 1
 
         return web.json_response({'code': 0, 'message': '获取票券使用记录成功', 'count': count, 'items': items})
