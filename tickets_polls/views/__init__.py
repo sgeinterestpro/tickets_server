@@ -35,8 +35,9 @@
 #                    $               $
 
 from .v_default import default_handle
+from .v_message import MessageHandles
 from .v_report import ReportHandles
+from .v_system import SystemHandles
 from .v_ticket import TicketHandles
 from .v_user import UserHandles
 from .v_web import WebHandles
-from .v_system import SystemHandles

@@ -25,7 +25,7 @@ from u_report import ReportBase
 class ReportHandles:
     @staticmethod
     async def report_export(request):
-        db = request.app['db']
+
         data = await request.json()
 
         if 'start' not in data or 'end' not in data:
@@ -45,8 +45,8 @@ class ReportHandles:
         if report_type not in reports:
             return web.json_response({'code': -2, 'message': '报表类型错误'})
 
-        user = await User.find_one(db, {'wx_open_id': request['open-id']})
-        user_init = await UserInit.find_one(db, {'_id': user['init_id']})
+        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user_init = await UserInit.m_find_one_by_user(user)
 
         report_class = reports[report_type]
         report = report_class(date_start, date_end)  # type: ReportBase

@@ -18,10 +18,10 @@ def setup_database(app):
     uri += '/{}'.format(quote_plus(conf['database']['name']))
     client = AsyncIOMotorClient(uri)
     app['db'] = client.get_database(quote_plus(conf['database']['name']))
-    config_database(app, uri, quote_plus(conf['database']['name']))
+    config_database(uri, quote_plus(conf['database']['name']))
 
 
-def config_database(app, uri, db_name):
+def config_database(uri, db_name):
     client = MongoClient(uri)
     db = client.get_database(db_name)
     # db.captcha.create_index('expire_time', expireAfterSeconds=3600)

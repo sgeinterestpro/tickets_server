@@ -17,7 +17,7 @@ import logging
 import smtplib
 from datetime import timedelta, datetime
 
-from model import UserInit
+from model import UserInit, Ticket
 from u_report import ReportUsedDtl
 
 
@@ -25,7 +25,7 @@ async def notice(app):
     logging.info(f'开始推送上一日报表')
     db = app['db']
     last_date = (datetime.now() + timedelta(days=-1)).strftime('%Y-%m-%d')
-    count = await db.ticket.count_documents({
+    count = await Ticket.count_documents({
         'state': 'verified',
         'expiry_date': {'$gte': last_date, '$lte': last_date}
     })
@@ -33,7 +33,7 @@ async def notice(app):
         logging.info(f'上一个自然日期{last_date}未产生数据')
         return
     report = ReportUsedDtl(last_date, None)
-    cursor = db.user_init.find({
+    cursor = UserInit.find({
         'role': 'admin'
     })
     email_list = []
