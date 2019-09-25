@@ -14,8 +14,9 @@
 
 """
 import logging
-
 from datetime import datetime, timedelta
+
+from model import Ticket, TicketCheck
 
 
 async def check(app):
@@ -24,13 +25,13 @@ async def check(app):
     state_map = app['config'].get('ticket', {}).get('state', {})
     ticket_check = {
         'checked_date': (datetime.now() + timedelta(days=-1)).strftime('%Y-%m-%d'),
-        'all': await db.ticket.count_documents({})
+        'all': await Ticket.count_documents({})
     }
     for state in state_map.keys():
-        count = await db.ticket.count_documents({
+        count = await Ticket.count_documents({
             'state': state,
         })
         ticket_check[state] = count
     ticket_check['check_time'] = datetime.now()
-    _ = await db.ticket_check.insert_one(ticket_check)
+    _ = await TicketCheck.insert_one(ticket_check)
     logging.info(f'票券钩稽关系统计完成')

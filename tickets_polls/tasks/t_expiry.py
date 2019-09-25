@@ -6,12 +6,14 @@ author: muumlover
 import logging
 from datetime import datetime
 
+from model import Ticket
+
 
 async def expiry(app):
     logging.info(f'开始处理过期票券')
     db = app['db']
     date_now = datetime.now().strftime('%Y-%m-%d')
-    res = await db.ticket.update_many({
+    res = await Ticket.update_many({
         'state': 'valid',
         'expiry_date': {'$lt': date_now}
     }, {

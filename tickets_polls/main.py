@@ -9,6 +9,7 @@ import logging
 from aiohttp import web
 
 from config import setup_config
+from model import setup_model
 from routes import setup_routes, setup_middleware
 from u_database import setup_database
 from u_email import setup_email
@@ -26,6 +27,7 @@ setup_routes(app)
 setup_middleware(app)
 
 setup_database(app)
+setup_model(app)  # 依赖 database
 setup_task(app)  # 依赖 database
 
 setup_email(app)

@@ -3,15 +3,21 @@ filename: model.py
 datetime: 2019-04-25
 author: muumlover
 """
+import uuid
 from datetime import datetime
 
 from bson import ObjectId
+
+
+def setup_model(app):
+    Model._db = app['db']
 
 
 class Model:
     """
     数据对象
     """
+    _db = None
     _id = None
     collection_name = None
     fled_list = []
@@ -55,11 +61,43 @@ class Model:
     #     return self._id.generation_time.astimezone()
 
     @classmethod
-    async def find_one(cls, db, data):
+    async def m_find_one(cls, data):
         if '_id' in data and ObjectId.is_valid(data['_id']):
             data['_id'] = ObjectId(data['_id'])
-        doc = await db[cls.collection_name].find_one(data)
+        doc = await Model._db[cls.collection_name].find_one(data)
         return cls(**(doc or {}))
+
+    @classmethod
+    async def find_one(cls, *args, **kwargs):
+        return await Model._db[cls.collection_name].find_one(*args, **kwargs)
+
+    @classmethod
+    async def insert_one(cls, *args, **kwargs):
+        return await Model._db[cls.collection_name].insert_one(*args, **kwargs)
+
+    @classmethod
+    async def update_one(cls, *args, **kwargs):
+        return await Model._db[cls.collection_name].update_one(*args, **kwargs)
+
+    @classmethod
+    async def delete_one(cls, *args, **kwargs):
+        return await Model._db[cls.collection_name].delete_one(*args, **kwargs)
+
+    @classmethod
+    def find(cls, *args, **kwargs):
+        return Model._db[cls.collection_name].find(*args, **kwargs)
+
+    @classmethod
+    async def insert_many(cls, *args, **kwargs):
+        return await Model._db[cls.collection_name].insert_many(*args, **kwargs)
+
+    @classmethod
+    async def count_documents(cls, *args, **kwargs):
+        return await Model._db[cls.collection_name].count_documents(*args, **kwargs)
+
+    @classmethod
+    def aggregate(cls, *args, **kwargs):
+        return Model._db[cls.collection_name].aggregate(*args, **kwargs)
 
     def to_object(self, include_id=False):
         json = {}
@@ -78,9 +116,38 @@ class Model:
             elif type(value) == ObjectId:
                 value = str(value)
             elif type(value) == datetime:
-                value = str(value)
+                value = value.strftime('%Y-%m-%d %H:%M:%S')
             json.update({key: value})
         return json
+
+
+class Captcha(Model):
+    collection_name = 'captcha'
+    fled_list = []
+    fled_default = {}
+
+
+class Message(Model):
+    class State:
+        admin_check = 'admin_check'
+        notice = 'notice'
+
+    class Operation:
+        ticket_generate = 'ticket_generate'
+
+    collection_name = 'message'
+    fled_list = [
+        'operation',
+        'operator',
+        'checker',
+        'content',
+        'params',
+        'state',
+        'time',
+    ]
+    fled_default = {
+        'state': 'default'
+    }
 
 
 class Ticket(Model):
@@ -93,10 +160,33 @@ class Ticket(Model):
         'purchaser', 'purch_time',
         'checker', 'check_time',
         'deleter', 'delete_time',
-        'overdue_time']
+        'overdue_time'
+    ]
     fled_default = {
         'state': 'default'
     }
+
+    @staticmethod
+    async def generate(raiser, raise_count):
+        ticket_id_base = 'SGE_{time}%s'.format(time=datetime.now().strftime('%Y%m%d'))
+        raise_time = datetime.now()
+        new_ticket_list = [Ticket(_id=ticket_id_base % (uuid.uuid1().hex.upper()),
+                                  raiser=raiser.mongo_id,
+                                  raise_time=raise_time).to_object(True) for _ in range(raise_count)]
+        res = await Ticket.insert_many(new_ticket_list)
+        return res.inserted_ids
+
+
+class TicketCheck(Model):
+    collection_name = 'ticket_check'
+    fled_list = []
+    fled_default = {}
+
+
+class TicketLog(Model):
+    collection_name = 'ticket_log'
+    fled_list = []
+    fled_default = {}
 
 
 class User(Model):
@@ -116,11 +206,11 @@ class User(Model):
     }
 
     @staticmethod
-    async def find_or_insert_one(db, data):
-        user_mongo = await db.user.find_one(data)
+    async def find_or_insert_one(data):
+        user_mongo = await User.find_one(data)
         if user_mongo is None:
             user = User(**data)
-            res = await db.user.insert_one(user.to_object())
+            res = await User.insert_one(user.to_object())
             if res.inserted_id is None:
                 pass
             user['id'] = res.inserted_id
@@ -145,6 +235,14 @@ class UserInit(Model):
         'role': []
     }
 
+    @property
+    def is_admin(self):
+        return 'admin' in self['role']
+
+    @staticmethod
+    async def m_find_one_by_user(user):
+        return await UserInit.m_find_one({'_id': user['init_id']})
+
 
 class Email(Model):
     collection_name = 'user_init'
@@ -162,11 +260,11 @@ class Email(Model):
     }
 
     @staticmethod
-    async def use_one(db):
-        cursor = db.email.find()
+    async def use_one():
+        cursor = Email.find()
         async for server in cursor:
             if server.get('used', 0) < server.get('limit', 0):
-                await db.email.update_one({
+                await Email.update_one({
                     'user': server['user']
                 }, {'$set': {
                     'used': server.get('used', 0) + 1

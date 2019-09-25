@@ -27,3 +27,11 @@ class SystemHandles:
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
         return web.Response(text=public_pem.decode())
+
+    @staticmethod
+    async def user_config(request):
+        return web.Response(text='')
+
+    @staticmethod
+    async def system_config(request):
+        return web.Response(text='')
