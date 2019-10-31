@@ -32,7 +32,7 @@ class WebHandles:
         _ = await User.update_one({
             '_id': captcha_doc['user_id']
         }, {
-            '$set': {'init_id': user_init_doc['_id']}
+            '$set': {'init_id': user_init_doc.mongo_id}
         })
 
         _ = await Captcha.delete_one({

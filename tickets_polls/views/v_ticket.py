@@ -476,7 +476,7 @@ class TicketHandles:
                 '''
                 items.append({
                     'option': ticket_log_doc.get('option', None),
-                    'time': str(ticket_log_doc.get('_id', None).generation_time.astimezone()),
+                    'time': str(ticket_log_doc.mongo_id.generation_time.astimezone()),
                     'ticket_id': ticket_log_doc.get('ticket_id', None),
                     'ticket_class': ticket_log_doc.get('ticket', {}).get('class', None),
                     'real_name': ticket_log_doc.get('init', {}).get('real_name', None),
