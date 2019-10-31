@@ -15,15 +15,16 @@
 """
 import pymongo
 from aiohttp import web
+from aiohttp.abc import Request, StreamResponse
 
 from model import User, Message, Ticket, UserInit
 
 
 class MessageHandles:
     @staticmethod
-    async def message_count(request):
+    async def message_count(request: Request) -> StreamResponse:
 
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         user_init = await UserInit.m_find_one_by_user(user)
 
         if user_init.is_admin:
@@ -31,7 +32,7 @@ class MessageHandles:
         else:
             message_types = [Message.State.notice]
 
-        count = await Message.count_documents({
+        count = await Message.count({
             'state': 'valid',
             'type': {'$in': message_types},
             # 'operator': {'$ne': user.mongo_id}
@@ -40,8 +41,8 @@ class MessageHandles:
         return web.json_response({'code': 0, 'message': '获取成功', 'count': count})
 
     @staticmethod
-    async def message_list(request):
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+    async def message_list(request: Request) -> StreamResponse:
+        user = await User.find_one({'wx_open_id': request['open-id']})
         user_init = await UserInit.m_find_one_by_user(user)
 
         if user_init.is_admin:
@@ -53,42 +54,49 @@ class MessageHandles:
             # 'state': 'valid',
             'type': {'$in': message_types},
             # 'operator': {'$ne': user.mongo_id}
-        }, sort=[('time', pymongo.DESCENDING)])
+        }).sort([('time', pymongo.DESCENDING)])
 
         message_list = []
-        async for message_doc in cursor:
-            message = Message(**message_doc)
+        async for message in cursor:
             message_list.append(message.to_json())
 
         return web.json_response({'code': 0, 'message': '获取成功', 'count': len(message_list), 'items': message_list})
 
     @staticmethod
-    async def message_action(request):
+    async def message_action(request: Request) -> StreamResponse:
 
         data = await request.json()
         if 'message_id' not in data or not data['message_id']:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
-        message = await Message.m_find_one({'_id': data['message_id'], 'state': 'valid'})
+        checker = await User.find_one({'wx_open_id': request['open-id']})
 
+        message = await Message.find_one({'_id': data['message_id'], 'state': 'valid'})
         if message is None:
             return web.json_response({'code': -1, 'message': '无效的消息'})
 
+        operator = await User.find_one({'_id': message['operator']})
+        if operator is None:
+            _ = await Message.update_one({'_id': message.mongo_id}, {'$set': {
+                'checker': checker.mongo_id,
+                'state': 'fail'
+            }})
+            return web.json_response({'code': -1, 'message': '操作发起者已注销', 'data': data})
+
+        if checker == operator:
+            return web.json_response({'code': -1, 'message': '不能由操作发起者执行复核操作', 'data': data})
+
         if message['operation'] == 'ticket_generate':
-            raiser_id = message['operator']
+            # 执行增发操作
             raise_count = message['params'].get('count', 0)
-            raiser = await User.m_find_one({'_id': raiser_id})
-
-            inserted_ids = await Ticket.generate(raiser, raise_count)  # 新加的
-
+            inserted_ids = await Ticket.generate(operator, raise_count)  # 新加的
             if len(inserted_ids) == 0:
                 return web.json_response({'code': -3, 'message': '票券增发成功'})
-
+            # 更新消息状态
             _ = await Message.update_one({'_id': message.mongo_id}, {'$set': {
-                'checker': user.mongo_id,
+                'checker': checker.mongo_id,
                 'state': 'success'
             }})
-            return web.json_response({'code': 0, 'message': '票券增发成功', 'data': data})
 
+            return web.json_response({'code': 0, 'message': '票券增发成功', 'data': data})
         return web.json_response({'code': -1, 'message': '操作执行失败'})

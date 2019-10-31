@@ -17,6 +17,7 @@ import uuid
 from datetime import datetime
 
 from aiohttp import web
+from aiohttp.abc import Request, StreamResponse
 from bson import ObjectId
 
 from model import User, UserInit, Captcha
@@ -110,7 +111,7 @@ def msg(url):
 class UserHandles:
 
     @staticmethod
-    async def user_info(request):
+    async def user_info(request: Request) -> StreamResponse:
 
         user_info = {}
         user = await User.find_or_insert_one({'wx_open_id': request['open-id']})
@@ -121,7 +122,7 @@ class UserHandles:
         return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user_info})
 
     @staticmethod
-    async def user_update(request):
+    async def user_update(request: Request) -> StreamResponse:
 
         data = await request.json()
         if 'userInfo' not in data:
@@ -133,19 +134,19 @@ class UserHandles:
         return web.json_response({'code': 0, 'message': '同步用户信息成功'})
 
     @staticmethod
-    async def user_bind(request):
+    async def user_bind(request: Request) -> StreamResponse:
 
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         data = await request.json()
 
         if user['init_id']:
             return web.json_response({'code': -1, 'message': '该微信已经绑定了其他邮箱'})
 
-        user_init_doc = await UserInit.m_find_one({'email': data['email']})
-        if not user_init_doc:
+        user_init = await UserInit.find_one({'email': data['email']})
+        if not user_init:
             return web.json_response({'code': -1, 'message': '该邮箱非组织内部人员邮箱'})
 
-        count = await User.count_documents({'email': data['email']})
+        count = await User.count({'email': data['email']})
         if count > 0:
             return web.json_response({'code': -1, 'message': '该邮箱已经绑定了其他微信'})
 
@@ -173,7 +174,7 @@ class UserHandles:
             return web.json_response({'code': -3, 'message': '邮件服务器繁忙'})
 
     @staticmethod
-    async def member_add(request):
+    async def member_add(request: Request) -> StreamResponse:
 
         data = await request.json()
 
@@ -197,13 +198,13 @@ class UserHandles:
         return web.json_response({'code': 0, 'message': '添加用户成功'})
 
     @staticmethod
-    async def member_delete(request):
+    async def member_delete(request: Request) -> StreamResponse:
 
         data = await request.json()
         if 'init_id' not in data:
             return web.json_response({'code': -1, 'message': '请求参数错误'})
 
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         if data['init_id'] == str(user['init_id']):
             return web.json_response({'code': -1, 'message': '无法删除正在使用的账号'})
 
@@ -214,13 +215,13 @@ class UserHandles:
         return web.json_response({'code': 0, 'message': '删除用户成功'})
 
     @staticmethod
-    async def member_find(request):
+    async def member_find(request: Request) -> StreamResponse:
 
         data = await request.json()
         if 'init_id' not in data:
             return web.json_response({'code': -1, 'message': '请求参数错误'})
 
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         user_init = await UserInit.m_find_one_by_user(user)
 
         if 'admin' not in user_init['role']:
@@ -228,9 +229,9 @@ class UserHandles:
 
         user_info = {}
 
-        t_user_init = await UserInit.m_find_one({'_id': ObjectId(data['init_id'])})
+        t_user_init = await UserInit.find_one({'_id': ObjectId(data['init_id'])})
 
-        t_user = await User.m_find_one({'init_id': t_user_init.mongo_id})
+        t_user = await User.find_one({'init_id': t_user_init.mongo_id})
         if t_user is not None:
             user_info.update(t_user.to_json())
             user_info['user_id'] = user_info.pop('_id')
@@ -241,23 +242,21 @@ class UserHandles:
         return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user_info})
 
     @staticmethod
-    async def member_list(request):
+    async def member_list(request: Request) -> StreamResponse:
 
         cursor = UserInit.find()
 
         count, items = 0, []
         # for ticket in await cursor.to_list(length=100):
-        async for user_init_doc in cursor:
+        async for user_init in cursor:
             user_info = {}
 
-            t_user_init = UserInit(**user_init_doc)
-
-            t_user = await User.m_find_one({'init_id': t_user_init.mongo_id})
+            t_user = await User.find_one({'init_id': user_init.mongo_id})
             if t_user is not None:
                 user_info.update(t_user.to_json())
                 user_info['user_id'] = user_info.pop('_id')
 
-            user_info.update(t_user_init.to_json())
+            user_info.update(user_init.to_json())
             user_info['init_id'] = user_info.pop('_id')
 
             items.append(user_info)

@@ -3,13 +3,13 @@ filename: u_task.py
 datetime: 2019-05-29
 author: muumlover
 """
-
+from aiohttp.abc import Application
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 import tasks
 
 
-def setup_task(app):
+def setup_task(app: Application) -> None:
     scheduler = AsyncIOScheduler({
         # 'apscheduler.jobstores.mongo': {
         #     'type': 'mongodb'

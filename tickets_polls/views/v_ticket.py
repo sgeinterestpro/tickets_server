@@ -7,6 +7,7 @@ import base64
 from datetime import datetime, timedelta
 
 from aiohttp import web
+from aiohttp.abc import Request, StreamResponse
 from cryptography.hazmat.primitives.asymmetric import padding
 
 from model import Ticket, User, UserInit, TicketLog, Message
@@ -16,13 +17,13 @@ from unit import date_week_start, date_week_end, date_month_start
 class TicketHandles:
 
     @staticmethod
-    async def ticket_package(request):
+    async def ticket_package(request: Request) -> StreamResponse:
         """
         获取用户拥有的票券
         :param request:
         :return:
         """
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         this_week_start = date_week_start().strftime('%Y-%m-%d')
         this_week_end = date_week_end().strftime('%Y-%m-%d')
         cursor = Ticket.find({
@@ -34,8 +35,7 @@ class TicketHandles:
         date_now = datetime.now().strftime('%Y-%m-%d')
         count, items = 0, []
         # for ticket in await cursor.to_list(length=100):
-        async for ticket_doc in cursor:
-            ticket = Ticket(**ticket_doc)
+        async for ticket in cursor:
             if ticket['state'] == 'valid' and date_now > ticket['expiry_date']:
                 ticket['state'] = 'expired'
             if ticket['state'] == 'delete':
@@ -46,7 +46,7 @@ class TicketHandles:
         return web.json_response({'code': 0, 'message': '获取票券列表成功', 'count': count, 'items': items})
 
     @staticmethod
-    async def ticket_purchase(request):
+    async def ticket_purchase(request: Request) -> StreamResponse:
         """
         申请领取一张票券
         :param request:
@@ -54,13 +54,13 @@ class TicketHandles:
         """
 
         # 获取用户信息
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         data = await request.json()
 
         # 检查本周领取限额
         this_week_start = date_week_start().strftime('%Y-%m-%d')
         this_week_end = date_week_end().strftime('%Y-%m-%d')
-        count = await Ticket.count_documents({
+        count = await Ticket.count({
             'purchaser': user.mongo_id,
             'purch_time': {'$gte': this_week_start, '$lte': this_week_end}
         })
@@ -91,14 +91,14 @@ class TicketHandles:
             return web.json_response({'code': -3, 'message': '更新票券信息失败'})
 
         # 插入票券记录
-        new_ticket = await Ticket.m_find_one(new_value)
+        new_ticket = await Ticket.find_one(new_value)
         _ = await TicketLog.insert_one(
             {'init_id': user['init_id'], 'option': 'purchase', 'ticket_id': new_ticket.json_id})
 
         return web.json_response({'code': 0, 'message': '票券领取成功'})
 
     @staticmethod
-    async def ticket_sign_in(request):
+    async def ticket_sign_in(request: Request) -> StreamResponse:
         """
         签到打卡
         :param request:
@@ -110,22 +110,23 @@ class TicketHandles:
         if 'checker_id' not in data or 'class' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
+        # 获取扫描员
+        checker = await User.find_one({'_id': data['checker_id']})
+        if not checker:
+            return web.json_response({'code': -1, 'message': '站点信息无效'})
+
         # 获取用户信息
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
 
         # 检查本周领取限额
         this_week_start = date_week_start().strftime('%Y-%m-%d')
         this_week_end = date_week_end().strftime('%Y-%m-%d')
-        count = await Ticket.count_documents({
+        count = await Ticket.count({
             'purchaser': user.mongo_id,
             'expiry_date': {'$gte': this_week_start, '$lte': this_week_end}
         })
-
         if count >= 3:
             return web.json_response({'code': -1, 'message': '已超过本周领取限额'})
-
-        # 获取扫描员
-        checker = await User.m_find_one({'_id': data['checker_id']})
 
         # 领取票券
         check_time = datetime.now()
@@ -147,7 +148,7 @@ class TicketHandles:
             return web.json_response({'code': -3, 'message': '更新票券信息失败'})
 
         # 生成票券使用记录
-        new_ticket = await Ticket.m_find_one(new_value)
+        new_ticket = await Ticket.find_one(new_value)
         _ = await TicketLog.insert_one(
             {'init_id': user['init_id'], 'option': 'purchase', 'ticket_id': new_ticket.json_id}
         )
@@ -155,20 +156,20 @@ class TicketHandles:
         return web.json_response({'code': 0, 'message': '票券领取成功'})
 
     @staticmethod
-    async def ticket_refund(request):
+    async def ticket_refund(request: Request) -> StreamResponse:
         """
         申请退回一张票券
         :param request:
         :return:
         """
         # todo 判断票券状态是否为已使用或已过期
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         data = await request.json()
 
         if 'ticket_id' not in data or not data['ticket_id']:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
-        ticket = await Ticket.m_find_one({'_id': data['ticket_id']})
+        ticket = await Ticket.find_one({'_id': data['ticket_id']})
 
         if ticket is None:
             return web.json_response({'code': -1, 'message': '无法删除不存在的票券'})
@@ -184,7 +185,7 @@ class TicketHandles:
             return web.json_response({'code': -1, 'message': '无法删除已过期票券'})
 
         # 检查本周删除限额
-        count = await Ticket.count_documents({
+        count = await Ticket.count({
             'deleter': user.mongo_id,
             'delete_time': {'$gte': date_week_start(), '$lte': date_week_end()}
         })
@@ -212,7 +213,7 @@ class TicketHandles:
         return web.json_response({'code': 0, 'message': '票券删除成功'})
 
     @staticmethod
-    async def ticket_inspect(request):
+    async def ticket_inspect(request: Request) -> StreamResponse:
         """
         获取 ticket 信息
         :param request:
@@ -228,12 +229,12 @@ class TicketHandles:
         ticket_id_encrypt = base64.b64decode(data['ticket_id'])
         ticket_id = private_key.decrypt(ticket_id_encrypt, padding.PKCS1v15()).decode()
 
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         user_init = await UserInit.m_find_one_by_user(user)
         if 'checker' not in user_init['role']:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
 
-        ticket = await Ticket.m_find_one({
+        ticket = await Ticket.find_one({
             '_id': ticket_id,
         })
 
@@ -256,10 +257,10 @@ class TicketHandles:
         if ticket['expiry_date'] > date_now:
             return web.json_response({'code': -1, 'message': '票券未生效'})
 
-        purchaser = await User.m_find_one({
+        purchaser = await User.find_one({
             '_id': ticket['purchaser']
         })
-        purchaser_init = await UserInit.m_find_one({
+        purchaser_init = await UserInit.find_one({
             '_id': purchaser['init_id']
         })
         return web.json_response({
@@ -270,7 +271,7 @@ class TicketHandles:
         })
 
     @staticmethod
-    async def ticket_checked(request):
+    async def ticket_checked(request: Request) -> StreamResponse:
         """
         使用 ticket
         :param request:
@@ -287,23 +288,23 @@ class TicketHandles:
         ticket_id_encrypt = base64.b64decode(data['ticket_id'])
         ticket_id = private_key.decrypt(ticket_id_encrypt, padding.PKCS1v15()).decode()
 
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         user_init = await UserInit.m_find_one_by_user(user)
         if 'checker' not in user_init['role']:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
 
-        ticket_doc = await Ticket.m_find_one({
+        ticket = await Ticket.find_one({
             '_id': ticket_id,
         })
-        if ticket_doc is None:
+        if not ticket:
             return web.json_response({'code': -1, 'message': '票券不存在'})
-        if ticket_doc['state'] != 'valid':
+        if ticket['state'] != 'valid':
             return web.json_response({'code': -1, 'message': '票券状态异常'})
         date_now = datetime.now().strftime('%Y-%m-%d')
-        if ticket_doc['expiry_date'] != date_now:
+        if ticket['expiry_date'] != date_now:
             return web.json_response({'code': -1, 'message': '票券日期不正确'})
 
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         res = await Ticket.update_one({
             '_id': data['ticket_id']
         }, {
@@ -319,14 +320,14 @@ class TicketHandles:
         if res.modified_count == 0:
             return web.json_response({'code': -3, 'message': '更新票券信息失败'})
 
-        purchaser = await User.m_find_one({'_id': ticket_doc['purchaser']})
+        purchaser = await User.find_one({'_id': ticket['purchaser']})
         _ = await TicketLog.insert_one(
             {'init_id': purchaser['init_id'], 'option': 'checked', 'ticket_id': data['ticket_id']})
 
         return web.json_response({'code': 0, 'message': '票券检票成功'})
 
     @staticmethod
-    async def ticket_generate(request):
+    async def ticket_generate(request: Request) -> StreamResponse:
 
         data = await request.json()
 
@@ -337,7 +338,7 @@ class TicketHandles:
         except ValueError:
             return web.json_response({'code': -2, 'message': '数量只能为十进制罗马数字'})
 
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         user_init = await UserInit.m_find_one_by_user(user)
         if 'admin' not in user_init['role']:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
@@ -357,9 +358,9 @@ class TicketHandles:
         return web.json_response({'code': 0, 'message': '增发操作提交成功'})
 
     @staticmethod
-    async def ticket_usage(request):
+    async def ticket_usage(request: Request) -> StreamResponse:
 
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         user_init = await UserInit.m_find_one_by_user(user)
         if 'admin' not in user_init['role']:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
@@ -369,11 +370,11 @@ class TicketHandles:
         data = {}
         for state in state_map.keys():
             if state == 'default':
-                count = await Ticket.count_documents({
+                count = await Ticket.count({
                     'state': state,
                 })
             else:
-                count = await Ticket.count_documents({
+                count = await Ticket.count({
                     'state': state,
                     'expiry_date': {'$gte': this_month_start}
                 })
@@ -381,14 +382,14 @@ class TicketHandles:
         return web.json_response({'code': 0, 'message': '获取票券数量信息成功', 'data': data})
 
     @staticmethod
-    async def ticket_log(request):
+    async def ticket_log(request: Request) -> StreamResponse:
         """
         获取票券记录
         :param request:
         :return:
         """
 
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         user_init = await UserInit.m_find_one_by_user(user)
         if not user_init or 'admin' not in user_init['role']:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
@@ -440,10 +441,11 @@ class TicketHandles:
         ]
 
         count, items = 0, []
-        count_all = await TicketLog.count_documents({'ticket_id': {'$ne': None}})
+        count_all = await TicketLog.count({'ticket_id': {'$ne': None}})
 
         if count_all > 0:
             cursor = TicketLog.aggregate(pipeline)
+            ticket_log_doc: dict
             async for ticket_log_doc in cursor:
                 '''目标数据格式
                 {
@@ -476,7 +478,7 @@ class TicketHandles:
                 '''
                 items.append({
                     'option': ticket_log_doc.get('option', None),
-                    'time': str(ticket_log_doc.mongo_id.generation_time.astimezone()),
+                    'time': str(ticket_log_doc['_id'].generation_time.astimezone()),
                     'ticket_id': ticket_log_doc.get('ticket_id', None),
                     'ticket_class': ticket_log_doc.get('ticket', {}).get('class', None),
                     'real_name': ticket_log_doc.get('init', {}).get('real_name', None),
@@ -486,11 +488,11 @@ class TicketHandles:
         return web.json_response({'code': 0, 'message': '获取票券记录成功', 'count': count, 'items': items})
 
     @staticmethod
-    async def ticket_check_log(request):
+    async def ticket_check_log(request: Request) -> StreamResponse:
 
         data = await request.json()
 
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         user_init = await UserInit.m_find_one_by_user(user)
         if 'checker' not in user_init['role']:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
@@ -503,7 +505,7 @@ class TicketHandles:
         except ValueError:
             return web.json_response({'code': -2, 'message': '日期输入错误'})
 
-        cursor = await Ticket.count_documents({})
+        cursor = await Ticket.count({})
         if cursor == 0:
             return web.json_response({'code': 0, 'message': '获取票券使用记录成功', 'count': 0, 'items': []})
 
@@ -550,7 +552,7 @@ class TicketHandles:
         ]
 
         count, items = 0, []
-        count_all = await Ticket.count_documents({'check_time': {'$gte': date_start, '$lte': date_end}})
+        count_all = await Ticket.count({'check_time': {'$gte': date_start, '$lte': date_end}})
         if count_all > 0:
             cursor = Ticket.aggregate(pipeline)
             async for ticket_doc in cursor:

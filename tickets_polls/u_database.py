@@ -5,11 +5,12 @@ author: muumlover
 """
 from urllib.parse import quote_plus
 
+from aiohttp.abc import Application
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
 
 
-def setup_database(app):
+def setup_database(app: Application) -> None:
     conf = app['config']
     uri = 'mongodb://'
     if conf['database']['user'] != '':
@@ -21,7 +22,7 @@ def setup_database(app):
     config_database(uri, quote_plus(conf['database']['name']))
 
 
-def config_database(uri, db_name):
+def config_database(uri: str, db_name: str) -> None:
     client = MongoClient(uri)
     db = client.get_database(db_name)
     # db.captcha.create_index('expire_time', expireAfterSeconds=3600)

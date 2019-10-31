@@ -6,10 +6,12 @@ author: muumlover
 import logging
 from datetime import datetime
 
+from aiohttp.abc import Application
+
 from model import Ticket
 
 
-async def expiry(app):
+async def expiry(app: Application) -> None:
     logging.info(f'开始处理过期票券')
     db = app['db']
     date_now = datetime.now().strftime('%Y-%m-%d')

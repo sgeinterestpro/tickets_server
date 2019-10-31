@@ -14,12 +14,13 @@
     
 """
 from aiohttp import web
+from aiohttp.abc import Request, StreamResponse
 from cryptography.hazmat.primitives import serialization
 
 
 class SystemHandles:
     @staticmethod
-    async def rsa_pub_key(request):
+    async def rsa_pub_key(request: Request) -> StreamResponse:
         private_key = request.app['private_key']
         public_key = private_key.public_key()
         public_pem = public_key.public_bytes(
@@ -29,9 +30,9 @@ class SystemHandles:
         return web.Response(text=public_pem.decode())
 
     @staticmethod
-    async def user_config(request):
+    async def user_config(request: Request) -> StreamResponse:
         return web.Response(text='')
 
     @staticmethod
-    async def system_config(request):
+    async def system_config(request: Request) -> StreamResponse:
         return web.Response(text='')
