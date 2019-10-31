@@ -22,6 +22,7 @@ from bson import ObjectId
 
 from model import User, UserInit, Captcha
 from u_email import EmailSender
+from unit import get_sport
 
 
 def msg(url):
@@ -119,6 +120,7 @@ class UserHandles:
         if user_init is not None:
             user_info.update(user_init.to_json())
         user_info.update(user.to_json())
+        user_info['sports'] = get_sport()
         return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user_info})
 
     @staticmethod

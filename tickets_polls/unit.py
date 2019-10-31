@@ -6,6 +6,25 @@ author: muumlover
 
 from datetime import timedelta, datetime
 
+sport_list = {
+    'badminton': [1, 3, 4],
+    'basketball': [1, 3],
+    'football': list(range(1, 8)),
+    'swim': [3, 5],
+    'yoga': [4],
+}
+
+
+def get_sport():
+    weekday = datetime.now().isoweekday()
+    return {
+        k: {
+            'enable': weekday in v,
+            'message': '' if weekday in v else f'仅限每周{"、".join([str(x) for x in v])}使用'
+        }
+        for k, v in sport_list.items()
+    }
+
 
 def date_show(date, fmt):
     return datetime.strptime(date, "%Y-%m-%d").strftime(fmt)
