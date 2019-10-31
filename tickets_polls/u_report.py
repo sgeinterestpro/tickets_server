@@ -150,7 +150,7 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
             style_body(sheet.cell(now_row, 2, (user_init or {}).get('department', '-')))  # 部门
             style_body(sheet.cell(now_row, 3, (user_init or {}).get('real_name', '-')))  # 姓名
             style_body(sheet.cell(now_row, 4, self.sport_map.get(ticket_doc.get('class'), '-')))  # 项目
-            style_body(sheet.cell(now_row, 5, str(ticket_doc.get('_id', '-'))[:20]))  # 票券编号
+            style_body(sheet.cell(now_row, 5, ticket_doc.json_id[:20]))  # 票券编号
             style_body(sheet.cell(now_row, 6, ticket_doc.get('purch_time', '-')))  # 领取时间
             style_body(sheet.cell(now_row, 7, self.state_map.get(ticket_doc.get('state'), '-')))  # 票券状态
             index += 1
@@ -400,7 +400,7 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
             style_body(sheet.cell(now_row, 2, (user_init or {}).get('department', '-')))  # 部门
             style_body(sheet.cell(now_row, 3, (user_init or {}).get('real_name', '-')))  # 姓名
             style_body(sheet.cell(now_row, 4, self.sport_map.get(ticket_doc.get('class'), '-')))  # 项目
-            style_body(sheet.cell(now_row, 5, str(ticket_doc.get('_id', '-'))[:20]))  # 票券编号
+            style_body(sheet.cell(now_row, 5, ticket_doc.json_id[:20]))  # 票券编号
             style_body(sheet.cell(now_row, 6, ticket_doc.get('purch_time', '-')))  # 领取时间
             style_body(sheet.cell(now_row, 7, ticket_doc.get('check_time', '-')))  # 使用时间
             index += 1
@@ -566,7 +566,7 @@ class ReportCheckLogFlow(ReportBase):
 
             style_body(sheet.cell(index + 4, 1, index + 1))  # 序号
             style_body(sheet.cell(index + 4, 2, ticket_doc['class']))  # 项目
-            style_body(sheet.cell(index + 4, 3, ticket_doc['_id']))  # 票券编号
+            style_body(sheet.cell(index + 4, 3, ticket_doc.json_id[:20]))  # 票券编号
             style_body(sheet.cell(index + 4, 4, ticket_doc['purch_time']))  # 领取时间
             style_body(sheet.cell(index + 4, 5, purchaser['realName']))  # 领取人员
             style_body(sheet.cell(index + 4, 6, ticket_doc['check_time']))  # 使用时间
