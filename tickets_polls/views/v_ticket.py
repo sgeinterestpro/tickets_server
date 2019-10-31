@@ -152,8 +152,8 @@ class TicketHandles:
         _ = await TicketLog.insert_one(
             {'init_id': user['init_id'], 'option': 'purchase', 'ticket_id': new_ticket.json_id}
         )
-
-        return web.json_response({'code': 0, 'message': '票券领取成功'})
+        check_time_show = check_time.strftime('%Y{}%m{}%d{} %H:%M:%S').format('年', '月', '日')
+        return web.json_response({'code': 0, 'message': '票券领取成功', 'data': {'time': check_time_show}})
 
     @staticmethod
     async def ticket_refund(request: Request) -> StreamResponse:
