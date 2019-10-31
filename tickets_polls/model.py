@@ -123,7 +123,12 @@ class Model:
 
 class Captcha(Model):
     collection_name = 'captcha'
-    fled_list = []
+    fled_list = [
+        'captcha',
+        'email',
+        'user_id',
+        'url',
+    ]
     fled_default = {}
 
 
