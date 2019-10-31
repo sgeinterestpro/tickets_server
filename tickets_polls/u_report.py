@@ -18,15 +18,18 @@ from datetime import datetime, timedelta
 from io import BytesIO
 
 import openpyxl
+from aiohttp.abc import Application
+from openpyxl import Workbook
 from openpyxl.styles import Border, Side, Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
 
 from model import Ticket, User, UserInit, TicketCheck, TicketLog
 from u_email import EmailSender
 from unit import date_month_start, date_month_end, date_show
 
 
-def setup_report(app):
+def setup_report(app: Application) -> None:
     ReportBase.sender = app['email']
     ReportBase.db = app['db']
     ReportBase.config = app['config']
@@ -39,7 +42,7 @@ def setup_report(app):
     }
 
 
-def style_title(cell):
+def style_title(cell) -> None:
     cell.alignment = Alignment(horizontal='center', vertical='center')
     cell.font = Font(size=16, bold=True)
 
@@ -109,14 +112,14 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
         wb.save(output)  # 写出到IO
         return f'{self._email_attach}.xlsx', output
 
-    async def write_wb(self, wb):
+    async def write_wb(self, wb: Workbook):
         pass
 
-    async def send(self, email_addr):
+    async def send(self, email_addr: str):
         attachs = await self.get_attachs()
         await self.sender.send(email_addr, self._email_subject, self._mail_msg, attachs)
 
-    async def sheet_ticket_dtl(self, sheet, date):
+    async def sheet_ticket_dtl(self, sheet: Worksheet, date: str):
         sheet.row_dimensions[1].hight = 28.5
         sheet.merge_cells('A1:G1')
         style_title(sheet.cell(1, 1, '运动券使用明细表'))
@@ -142,20 +145,20 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
         }).sort('expiry_date')
         index = 0
         offset = 0
-        async for ticket_doc in cursor:
+        async for ticket in cursor:
             now_row = index + offset + 4
-            user = await User.m_find_one({'_id': ticket_doc['purchaser']})
-            user_init = await UserInit.m_find_one({'_id': (user or {}).get('init_id')})
+            user = await User.find_one({'_id': ticket['purchaser']})
+            user_init = await UserInit.find_one({'_id': (user or {}).get('init_id')})
             style_body(sheet.cell(now_row, 1, index + 1))  # 序号
             style_body(sheet.cell(now_row, 2, (user_init or {}).get('department', '-')))  # 部门
             style_body(sheet.cell(now_row, 3, (user_init or {}).get('real_name', '-')))  # 姓名
-            style_body(sheet.cell(now_row, 4, self.sport_map.get(ticket_doc.get('class'), '-')))  # 项目
-            style_body(sheet.cell(now_row, 5, ticket_doc.json_id[:20]))  # 票券编号
-            style_body(sheet.cell(now_row, 6, ticket_doc.get('purch_time', '-')))  # 领取时间
-            style_body(sheet.cell(now_row, 7, self.state_map.get(ticket_doc.get('state'), '-')))  # 票券状态
+            style_body(sheet.cell(now_row, 4, self.sport_map.get(ticket.get('class'), '-')))  # 项目
+            style_body(sheet.cell(now_row, 5, ticket.json_id[:20]))  # 票券编号
+            style_body(sheet.cell(now_row, 6, ticket.get('purch_time', '-')))  # 领取时间
+            style_body(sheet.cell(now_row, 7, self.state_map.get(ticket.get('state'), '-')))  # 票券状态
             index += 1
 
-    async def sheet_month_count(self, sheet, date_start, date_end):
+    async def sheet_month_count(self, sheet: Worksheet, date_start: str, date_end: str):
         """
         运动券使用统计月报表
         :param sheet:
@@ -196,10 +199,10 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
             cursor = Ticket.find({
                 'expiry_date': {'$gte': month_start_str, '$lte': month_end_str}
             }).sort('expiry_date')
-            async for ticket_doc in cursor:
-                if ticket_doc.get('state') == 'verified':
-                    sport_month['sports'][ticket_doc.get('class')] += 1
-                    sport_all['sports'][ticket_doc.get('class')] += 1
+            async for ticket in cursor:
+                if ticket.get('state') == 'verified':
+                    sport_month['sports'][ticket.get('class')] += 1
+                    sport_all['sports'][ticket.get('class')] += 1
             sport_months.append(sport_month)
 
         # 写入报表标题
@@ -267,7 +270,7 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
             now_column += 1
         style_body(sheet.cell(now_row, now_column, count_all))  # 合计
 
-    async def sheet_day_count(self, sheet, date_start, date_end):
+    async def sheet_day_count(self, sheet: Worksheet, date_start: str, date_end: str):
         """
         运动券使用统计日报表
         :param sheet:
@@ -313,9 +316,9 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
             'expiry_date': {'$gte': date_start, '$lte': date_end}
         }).sort('expiry_date')
 
-        async for ticket_doc in cursor:
-            date_now = ticket_doc.get('expiry_date', '-')
-            sport_days[date_now][ticket_doc.get('class')] += 1
+        async for ticket in cursor:
+            date_now = ticket.get('expiry_date', '-')
+            sport_days[date_now][ticket.get('class')] += 1
 
         now_row += 1  # 3
         for sport_day_i, (sport_day, sports) in enumerate(sport_days.items()):
@@ -359,7 +362,7 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
         now_column += 1
         style_body(sheet.cell(now_row, now_column, None))  # 备注
 
-    async def sheet_day_dtl(self, sheet, date):
+    async def sheet_day_dtl(self, sheet: Worksheet, date: str):
         """
         运动券使用统计日明细报表
         :param sheet:
@@ -392,20 +395,20 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
         }).sort('expiry_date')
         index = 0
         offset = 0
-        async for ticket_doc in cursor:
+        async for ticket in cursor:
             now_row = index + offset + 4
-            user = await User.m_find_one({'_id': ticket_doc['purchaser']})
-            user_init = await UserInit.m_find_one({'_id': (user or {}).get('init_id')})
+            user = await User.find_one({'_id': ticket['purchaser']})
+            user_init = await UserInit.find_one({'_id': (user or {}).get('init_id')})
             style_body(sheet.cell(now_row, 1, index + 1))  # 序号
             style_body(sheet.cell(now_row, 2, (user_init or {}).get('department', '-')))  # 部门
             style_body(sheet.cell(now_row, 3, (user_init or {}).get('real_name', '-')))  # 姓名
-            style_body(sheet.cell(now_row, 4, self.sport_map.get(ticket_doc.get('class'), '-')))  # 项目
-            style_body(sheet.cell(now_row, 5, ticket_doc.json_id[:20]))  # 票券编号
-            style_body(sheet.cell(now_row, 6, ticket_doc.get('purch_time', '-')))  # 领取时间
-            style_body(sheet.cell(now_row, 7, ticket_doc.get('check_time', '-')))  # 使用时间
+            style_body(sheet.cell(now_row, 4, self.sport_map.get(ticket.get('class'), '-')))  # 项目
+            style_body(sheet.cell(now_row, 5, ticket.json_id[:20]))  # 票券编号
+            style_body(sheet.cell(now_row, 6, ticket.get('purch_time', '-')))  # 领取时间
+            style_body(sheet.cell(now_row, 7, ticket.get('check_time', '-')))  # 使用时间
             index += 1
 
-    async def sheet_day_check(self, sheet, date_start, date_end):
+    async def sheet_day_check(self, sheet: Worksheet, date_start: str, date_end: str):
         sheet.row_dimensions[1].hight = 28.5
         sheet.merge_cells('A1:G1')
         style_title(sheet.cell(1, 1, '运动券使用明细表'))
@@ -431,15 +434,15 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
         }).sort('checked_date')
         index = 0
         offset = 0
-        async for ticket_check_doc in cursor:
+        async for ticket_check in cursor:
             now_row = index + offset + 4
-            style_body(sheet.cell(now_row, 1, ticket_check_doc.get('checked_date')))  # 统计日期
-            style_body(sheet.cell(now_row, 2, ticket_check_doc.get('all')))  # 票券总量
-            style_body(sheet.cell(now_row, 3, ticket_check_doc.get('default')))  # 未使用量
-            style_body(sheet.cell(now_row, 4, ticket_check_doc.get('valid')))  # 已领取量
-            style_body(sheet.cell(now_row, 5, ticket_check_doc.get('verified')))  # 已使用量
-            style_body(sheet.cell(now_row, 6, ticket_check_doc.get('expired')))  # 已过期量
-            style_body(sheet.cell(now_row, 7, ticket_check_doc.get('delete')))  # 已删除量
+            style_body(sheet.cell(now_row, 1, ticket_check.get('checked_date')))  # 统计日期
+            style_body(sheet.cell(now_row, 2, ticket_check.get('all')))  # 票券总量
+            style_body(sheet.cell(now_row, 3, ticket_check.get('default')))  # 未使用量
+            style_body(sheet.cell(now_row, 4, ticket_check.get('valid')))  # 已领取量
+            style_body(sheet.cell(now_row, 5, ticket_check.get('verified')))  # 已使用量
+            style_body(sheet.cell(now_row, 6, ticket_check.get('expired')))  # 已过期量
+            style_body(sheet.cell(now_row, 7, ticket_check.get('delete')))  # 已删除量
             index += 1
 
 
@@ -456,7 +459,7 @@ class ReportUsedDtl(ReportBase):
             date_show(self.date, "%Y.%m.%d"),
         )
 
-    async def write_wb(self, wb):
+    async def write_wb(self, wb: Workbook):
         sheet = wb.active  # 获取sheet对象
         await self.sheet_day_dtl(sheet, self.date)  # 写入Sheet
 
@@ -466,7 +469,7 @@ class ReportUsedDay(ReportBase):
     date_start = None
     date_end = None
 
-    def __init__(self, date_start, date_end):
+    def __init__(self, date_start: str, date_end: str):
         super().__init__()
         self.date_start = date_start
         self.date_end = date_end
@@ -476,7 +479,7 @@ class ReportUsedDay(ReportBase):
             date_show(self.date_end, "%Y.%m.%d")
         )
 
-    async def write_wb(self, wb):
+    async def write_wb(self, wb: Workbook):
         sheet = wb.active  # 使用默认的Sheet
         sheet.title = '统计'  # 写入Sheet标题
         await self.sheet_day_count(sheet, self.date_start, self.date_end)  # 输出报表内容
@@ -485,9 +488,9 @@ class ReportUsedDay(ReportBase):
             'expiry_date': {'$gte': self.date_start, '$lte': self.date_end}
         }).sort('expiry_date')
         date_now = self.date_end
-        async for ticket_doc in cursor:
-            if date_now != ticket_doc.get('expiry_date', '-'):
-                date_now = ticket_doc.get('expiry_date', '-')
+        async for ticket in cursor:
+            if date_now != ticket.get('expiry_date', '-'):
+                date_now = ticket.get('expiry_date', '-')
                 sheet = wb.create_sheet(date_now)  # 创建一个sheet对象
                 await self.sheet_day_dtl(sheet, date_now)  # 输出报表内容
 
@@ -497,7 +500,7 @@ class ReportUsedMonth(ReportBase):
     date_start = None
     date_end = None
 
-    def __init__(self, date_start, date_end):
+    def __init__(self, date_start: str, date_end: str):
         super().__init__()
         self.date_start = date_start
         self.date_end = date_end
@@ -507,7 +510,7 @@ class ReportUsedMonth(ReportBase):
             date_show(self.date_end, "%Y.%m")
         )
 
-    async def write_wb(self, wb):
+    async def write_wb(self, wb: Workbook):
         # 创建一个sheet对象
         sheet = wb.active
         await self.sheet_month_count(sheet, self.date_start, self.date_end)  # 写入Sheet
@@ -518,7 +521,7 @@ class ReportDayCheck(ReportBase):
     date_start = None
     date_end = None
 
-    def __init__(self, date_start, date_end):
+    def __init__(self, date_start: str, date_end: str):
         super().__init__()
         self.date_start = date_start
         self.date_end = date_end
@@ -528,7 +531,7 @@ class ReportDayCheck(ReportBase):
             date_show(self.date_end, "%Y.%m.%d")
         )
 
-    async def write_wb(self, wb):
+    async def write_wb(self, wb: Workbook):
         sheet = wb.active  # 使用默认的Sheet
         sheet.title = '统计'  # 写入Sheet标题
         await self.sheet_day_check(sheet, self.date_start, self.date_end)  # 输出报表内容
@@ -537,7 +540,7 @@ class ReportDayCheck(ReportBase):
 class ReportCheckLogFlow(ReportBase):
     _email_subject = '运动券使用记录流水表'
 
-    async def write_wb(self, wb):
+    async def write_wb(self, wb: Workbook):
         # 创建一个sheet对象
         sheet = wb.active
         # 写入文件标题
@@ -560,16 +563,16 @@ class ReportCheckLogFlow(ReportBase):
             if 'checked' != ticket_log['option']:
                 continue
 
-            ticket_doc = await Ticket.m_find_one({'_id': ticket_log['ticket_id'], })
-            purchaser = await User.m_find_one({'_id': ticket_doc['purchaser'], })
-            checker = await User.m_find_one({'_id': ticket_doc['checker'], })
+            ticket = await Ticket.find_one({'_id': ticket_log['ticket_id'], })
+            purchaser = await User.find_one({'_id': ticket['purchaser'], })
+            checker = await User.find_one({'_id': ticket['checker'], })
 
             style_body(sheet.cell(index + 4, 1, index + 1))  # 序号
-            style_body(sheet.cell(index + 4, 2, ticket_doc['class']))  # 项目
-            style_body(sheet.cell(index + 4, 3, ticket_doc.json_id[:20]))  # 票券编号
-            style_body(sheet.cell(index + 4, 4, ticket_doc['purch_time']))  # 领取时间
+            style_body(sheet.cell(index + 4, 2, ticket['class']))  # 项目
+            style_body(sheet.cell(index + 4, 3, ticket.json_id[:20]))  # 票券编号
+            style_body(sheet.cell(index + 4, 4, ticket['purch_time']))  # 领取时间
             style_body(sheet.cell(index + 4, 5, purchaser['realName']))  # 领取人员
-            style_body(sheet.cell(index + 4, 6, ticket_doc['check_time']))  # 使用时间
+            style_body(sheet.cell(index + 4, 6, ticket['check_time']))  # 使用时间
             style_body(sheet.cell(index + 4, 7, checker['realName']))  # 检票人员
 
             index += 1
@@ -587,7 +590,7 @@ class ReportCheckLogFlow(ReportBase):
 #             date_show(self.date, "%Y.%m")
 #         )
 #
-#     async def write_wb(self, wb):
+#     async def write_wb(self, wb: Workbook):
 #         not_end = False
 #         month_start = date_month_start(datetime.strptime(self.date, '%Y-%m-%d'))
 #         month_end = date_month_end(datetime.strptime(self.date, '%Y-%m-%d'))

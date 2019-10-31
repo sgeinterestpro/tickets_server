@@ -14,25 +14,26 @@
 
 """
 from aiohttp import web
+from aiohttp.abc import Request, StreamResponse
 
 from model import User, UserInit, Captcha
 
 
 class WebHandles:
     @staticmethod
-    async def email_check(request):
+    async def email_check(request: Request) -> StreamResponse:
         random_code = request.match_info.get('uuid', '')
-        captcha_doc = await Captcha.m_find_one({
+        captcha = await Captcha.find_one({
             'captcha': random_code,
         })
-        if captcha_doc is None:
+        if captcha is None:
             return web.Response(text='验证链接已经失效')
 
-        user_init_doc = await UserInit.m_find_one({'email': captcha_doc['email']})
+        user_init = await UserInit.find_one({'email': captcha['email']})
         _ = await User.update_one({
-            '_id': captcha_doc['user_id']
+            '_id': captcha['user_id']
         }, {
-            '$set': {'init_id': user_init_doc.mongo_id}
+            '$set': {'init_id': user_init.mongo_id}
         })
 
         _ = await Captcha.delete_one({

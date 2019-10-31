@@ -16,19 +16,20 @@
 import logging
 from datetime import datetime, timedelta
 
+from aiohttp.web_app import Application
+
 from model import Ticket, TicketCheck
 
 
-async def check(app):
+async def check(app: Application) -> None:
     logging.info(f'开始统计票券钩稽关系')
-    db = app['db']
     state_map = app['config'].get('ticket', {}).get('state', {})
     ticket_check = {
         'checked_date': (datetime.now() + timedelta(days=-1)).strftime('%Y-%m-%d'),
-        'all': await Ticket.count_documents({})
+        'all': await Ticket.count({})
     }
     for state in state_map.keys():
-        count = await Ticket.count_documents({
+        count = await Ticket.count({
             'state': state,
         })
         ticket_check[state] = count

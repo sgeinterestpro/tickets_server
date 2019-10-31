@@ -5,15 +5,40 @@ author: muumlover
 """
 import uuid
 from datetime import datetime
+from typing import Awaitable, Optional, AsyncIterable
 
+from aiohttp.abc import Application
 from bson import ObjectId
+from motor.motor_asyncio import AsyncIOMotorCursor
+from pymongo.results import UpdateResult, InsertManyResult, DeleteResult, InsertOneResult
 
 
-def setup_model(app):
+def setup_model(app: Application) -> None:
     Model._db = app['db']
 
 
-class Model:
+class ModelCursor(object):
+    cls: type
+    cursor: AsyncIOMotorCursor
+
+    def __init__(self, cls: type, cursor: AsyncIOMotorCursor):
+        self.cls = cls
+        self.cursor = cursor
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self) -> 'Model':
+        async for doc in self.cursor:
+            return self.cls(**(doc or {}))
+        else:
+            raise StopAsyncIteration
+
+    def sort(self, *args, **kwargs) -> 'ModelCursor':
+        return ModelCursor(self.cls, self.cursor.sort(*args, **kwargs))
+
+
+class Model(object):
     """
     数据对象
     """
@@ -36,20 +61,26 @@ class Model:
             else:
                 self.__setattr__('_{}'.format(key), kwargs[key])
 
+    def __eq__(self, other: 'Model'):
+        return self.mongo_id == other.mongo_id
+
     def __getitem__(self, item):
         return self.__getattribute__('_{}'.format(item))
 
     def __setitem__(self, key, value):
         return self.__setattr__('_{}'.format(key), value)
 
+    def get(self, key, default=None):
+        return self[key] if key in self else default
+
     @property
-    def mongo_id(self):
+    def mongo_id(self) -> Optional[ObjectId]:
         if self._id is None:
             return
         return self._id
 
     @property
-    def json_id(self):
+    def json_id(self) -> str:
         if self._id is None:
             return ''
         return str(self._id)
@@ -61,45 +92,56 @@ class Model:
     #     return self._id.generation_time.astimezone()
 
     @classmethod
-    async def m_find_one(cls, data):
+    async def find_one(cls, data) -> 'Model':
+        """
+        
+        :type data: dict
+        :rtype: Awaitable[Model]
+        :param data: 
+        :return: 
+        """
         if '_id' in data and ObjectId.is_valid(data['_id']):
             data['_id'] = ObjectId(data['_id'])
         doc = await Model._db[cls.collection_name].find_one(data)
         return cls(**(doc or {}))
 
     @classmethod
-    async def find_one(cls, *args, **kwargs):
-        return await Model._db[cls.collection_name].find_one(*args, **kwargs)
+    def find(cls, *args, **kwargs) -> ModelCursor:
+        return ModelCursor(cls, Model._db[cls.collection_name].find(*args, **kwargs))
 
     @classmethod
-    async def insert_one(cls, *args, **kwargs):
+    def aggregate(cls, *args, **kwargs) -> AsyncIterable[dict]:
+        return Model._db[cls.collection_name].aggregate(*args, **kwargs)
+
+    @classmethod
+    async def insert_one(cls, *args, **kwargs) -> InsertOneResult:
         return await Model._db[cls.collection_name].insert_one(*args, **kwargs)
 
     @classmethod
-    async def update_one(cls, *args, **kwargs):
+    async def update_one(cls, *args, **kwargs) -> UpdateResult:
         return await Model._db[cls.collection_name].update_one(*args, **kwargs)
 
     @classmethod
-    async def delete_one(cls, *args, **kwargs):
+    async def delete_one(cls, *args, **kwargs) -> DeleteResult:
         return await Model._db[cls.collection_name].delete_one(*args, **kwargs)
 
     @classmethod
-    def find(cls, *args, **kwargs):
-        return Model._db[cls.collection_name].find(*args, **kwargs)
-
-    @classmethod
-    async def insert_many(cls, *args, **kwargs):
+    async def insert_many(cls, *args, **kwargs) -> InsertManyResult:
         return await Model._db[cls.collection_name].insert_many(*args, **kwargs)
 
     @classmethod
-    async def count_documents(cls, *args, **kwargs):
-        return await Model._db[cls.collection_name].count_documents(*args, **kwargs)
+    async def update_many(cls, *args, **kwargs) -> Awaitable[UpdateResult]:
+        return await Model._db[cls.collection_name].update_many(*args, **kwargs)
 
     @classmethod
-    def aggregate(cls, *args, **kwargs):
-        return Model._db[cls.collection_name].aggregate(*args, **kwargs)
+    async def count(cls, *args, **kwargs) -> int:
+        """
 
-    def to_object(self, include_id=False):
+        :rtype: int
+        """
+        return await Model._db[cls.collection_name].count_documents(*args, **kwargs)
+
+    def to_object(self, include_id: bool = False) -> dict:
         json = {}
         if include_id:
             json.update({'_id': self.mongo_id})
@@ -107,7 +149,7 @@ class Model:
             json.update({key: self.__getattribute__('_{}'.format(key))})
         return json
 
-    def to_json(self):
+    def to_json(self) -> dict:
         json = {'_id': self.json_id}
         for key in self.fled_list:
             value = self.__getattribute__('_{}'.format(key))
@@ -212,15 +254,13 @@ class User(Model):
 
     @staticmethod
     async def find_or_insert_one(data):
-        user_mongo = await User.find_one(data)
-        if user_mongo is None:
+        user = await User.find_one(data)
+        if not user:
             user = User(**data)
             res = await User.insert_one(user.to_object())
             if res.inserted_id is None:
                 pass
             user['id'] = res.inserted_id
-        else:
-            user = User(**user_mongo)
         return user
 
 
@@ -241,12 +281,12 @@ class UserInit(Model):
     }
 
     @property
-    def is_admin(self):
+    def is_admin(self) -> bool:
         return 'admin' in self['role']
 
     @staticmethod
     async def m_find_one_by_user(user):
-        return await UserInit.m_find_one({'_id': user['init_id']})
+        return await UserInit.find_one({'_id': user['init_id']})
 
 
 class Email(Model):
@@ -267,6 +307,7 @@ class Email(Model):
     @staticmethod
     async def use_one():
         cursor = Email.find()
+        server: Model
         async for server in cursor:
             if server.get('used', 0) < server.get('limit', 0):
                 await Email.update_one({

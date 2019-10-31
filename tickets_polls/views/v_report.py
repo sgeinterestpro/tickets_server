@@ -17,6 +17,7 @@ import smtplib
 from datetime import datetime
 
 from aiohttp import web
+from aiohttp.abc import Request, StreamResponse
 
 from model import User, UserInit
 from u_report import ReportBase
@@ -24,7 +25,7 @@ from u_report import ReportBase
 
 class ReportHandles:
     @staticmethod
-    async def report_export(request):
+    async def report_export(request: Request) -> StreamResponse:
 
         data = await request.json()
 
@@ -45,7 +46,7 @@ class ReportHandles:
         if report_type not in reports:
             return web.json_response({'code': -2, 'message': '报表类型错误'})
 
-        user = await User.m_find_one({'wx_open_id': request['open-id']})
+        user = await User.find_one({'wx_open_id': request['open-id']})
         user_init = await UserInit.m_find_one_by_user(user)
 
         report_class = reports[report_type]

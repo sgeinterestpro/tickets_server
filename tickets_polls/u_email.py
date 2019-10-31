@@ -12,9 +12,10 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import dns.resolver
+from aiohttp.abc import Application
 
 
-def setup_email(app):
+def setup_email(app: Application) -> None:
     EmailSender.charset = app['config']['email']['charset']
     EmailSender.sender = app['config']['email']['sender']
     app['email'] = EmailSender

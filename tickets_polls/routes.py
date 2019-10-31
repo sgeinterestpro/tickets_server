@@ -3,11 +3,13 @@ filename: routes.py
 datetime: 2019-04-19
 author: muumlover
 """
+from aiohttp.abc import Application
+
 from middleware import auth_middleware
 from views import *
 
 
-def setup_routes(app):
+def setup_routes(app: Application) -> None:
     app.router.add_route('*', '/', default_handle)
     app.router.add_route('*', '/ticket_package', TicketHandles.ticket_package)
     app.router.add_route('*', '/ticket_purchase', TicketHandles.ticket_purchase)
@@ -41,5 +43,5 @@ def setup_routes(app):
     app.router.add_route('*', '/web/email_check/{uuid}', WebHandles.email_check, name='email-check')
 
 
-def setup_middleware(app):
+def setup_middleware(app: Application) -> None:
     app.middlewares.append(auth_middleware)

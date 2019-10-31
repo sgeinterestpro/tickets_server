@@ -17,15 +17,17 @@ import logging
 import smtplib
 from datetime import timedelta, datetime
 
+from aiohttp.abc import Application
+
 from model import UserInit, Ticket
 from u_report import ReportUsedDtl
 
 
-async def notice(app):
+async def notice(app: Application) -> None:
     logging.info(f'开始推送上一日报表')
     db = app['db']
     last_date = (datetime.now() + timedelta(days=-1)).strftime('%Y-%m-%d')
-    count = await Ticket.count_documents({
+    count = await Ticket.count({
         'state': 'verified',
         'expiry_date': {'$gte': last_date, '$lte': last_date}
     })
@@ -37,8 +39,7 @@ async def notice(app):
         'role': 'admin'
     })
     email_list = []
-    async for user_init_doc in cursor:
-        user_init = UserInit(**user_init_doc)
+    async for user_init in cursor:
         email_list.append(user_init['email'])
     try:
         await report.send(email_list)

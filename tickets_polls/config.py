@@ -7,6 +7,7 @@ import base64
 import pathlib
 
 import yaml
+from aiohttp.abc import Application
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
@@ -34,7 +35,7 @@ def load_config(config_path):
     return config
 
 
-def setup_config(app):
+def setup_config(app: Application) -> None:
     conf = load_config(str(pathlib.Path('.') / 'config' / 'polls.yaml'))
     app['config'] = conf
 
