@@ -4,7 +4,7 @@ server:
 database:
   host: 127.0.0.1
   port: 27017
-  name: ticket
+  name: ticket_test
   user:
   pass:
 email:
