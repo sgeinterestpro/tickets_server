@@ -16,6 +16,7 @@ sport_list = {
 
 
 def get_sport():
+    # Todo 修改为系统设置存到数据库
     weekday = datetime.now().isoweekday()
     return {
         k: {
