@@ -11,7 +11,7 @@ from aiohttp.abc import Request, StreamResponse
 from cryptography.hazmat.primitives.asymmetric import padding
 
 from model import Ticket, User, UserInit, TicketLog, Message
-from unit import date_week_start, date_week_end, date_month_start
+from unit import date_week_start, date_week_end, date_month_start, sport_list
 
 
 class TicketHandles:
@@ -127,6 +127,11 @@ class TicketHandles:
         })
         if count >= 3:
             return web.json_response({'code': -1, 'message': '已超过本周领取限额'})
+
+        # 检查是否满足星期限制
+        weekday = datetime.now().isoweekday()
+        if weekday not in sport_list.get(data['class'], []):
+            return web.json_response({'code': -1, 'message': '今日不可领取该类型的票券'})
 
         # 领取票券
         check_time = datetime.now()
