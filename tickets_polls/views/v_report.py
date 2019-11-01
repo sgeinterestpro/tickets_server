@@ -47,7 +47,7 @@ class ReportHandles:
             return web.json_response({'code': -2, 'message': '报表类型错误'})
 
         user = await User.find_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.m_find_one_by_user(user)
+        user_init = await UserInit.find_one_by_user(user)
 
         report_class = reports[report_type]
         report = report_class(date_start, date_end)  # type: ReportBase

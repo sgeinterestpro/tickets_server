@@ -284,8 +284,12 @@ class UserInit(Model):
     def is_admin(self) -> bool:
         return 'admin' in self['role']
 
+    @property
+    def is_checker(self) -> bool:
+        return 'checker' in self['role']
+
     @staticmethod
-    async def m_find_one_by_user(user):
+    async def find_one_by_user(user: User):
         return await UserInit.find_one({'_id': user['init_id']})
 
 

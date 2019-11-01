@@ -235,8 +235,8 @@ class TicketHandles:
         ticket_id = private_key.decrypt(ticket_id_encrypt, padding.PKCS1v15()).decode()
 
         user = await User.find_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.m_find_one_by_user(user)
-        if 'checker' not in user_init['role']:
+        user_init = await UserInit.find_one_by_user(user)
+        if not user_init.is_checker:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
 
         ticket = await Ticket.find_one({
@@ -294,8 +294,8 @@ class TicketHandles:
         ticket_id = private_key.decrypt(ticket_id_encrypt, padding.PKCS1v15()).decode()
 
         user = await User.find_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.m_find_one_by_user(user)
-        if 'checker' not in user_init['role']:
+        user_init = await UserInit.find_one_by_user(user)
+        if not user_init.is_checker:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
 
         ticket = await Ticket.find_one({
@@ -344,8 +344,8 @@ class TicketHandles:
             return web.json_response({'code': -2, 'message': '数量只能为十进制罗马数字'})
 
         user = await User.find_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.m_find_one_by_user(user)
-        if 'admin' not in user_init['role']:
+        user_init = await UserInit.find_one_by_user(user)
+        if not user_init.is_admin:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
 
         # 改为需二次复核的方式
@@ -366,8 +366,8 @@ class TicketHandles:
     async def ticket_usage(request: Request) -> StreamResponse:
 
         user = await User.find_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.m_find_one_by_user(user)
-        if 'admin' not in user_init['role']:
+        user_init = await UserInit.find_one_by_user(user)
+        if not user_init.is_admin:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
 
         this_month_start = date_month_start().strftime('%Y-%m-%d')
@@ -395,8 +395,8 @@ class TicketHandles:
         """
 
         user = await User.find_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.m_find_one_by_user(user)
-        if not user_init or 'admin' not in user_init['role']:
+        user_init = await UserInit.find_one_by_user(user)
+        if not user_init.is_admin:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
 
         data = await request.json()
@@ -498,8 +498,8 @@ class TicketHandles:
         data = await request.json()
 
         user = await User.find_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.m_find_one_by_user(user)
-        if 'checker' not in user_init['role']:
+        user_init = await UserInit.find_one_by_user(user)
+        if not user_init.is_checker:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
 
         start = data.get('start', datetime.now().strftime('%Y-%m-%d'))

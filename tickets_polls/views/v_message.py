@@ -25,7 +25,7 @@ class MessageHandles:
     async def message_count(request: Request) -> StreamResponse:
 
         user = await User.find_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.m_find_one_by_user(user)
+        user_init = await UserInit.find_one_by_user(user)
 
         if user_init.is_admin:
             message_types = [Message.State.admin_check, Message.State.notice]
@@ -43,7 +43,7 @@ class MessageHandles:
     @staticmethod
     async def message_list(request: Request) -> StreamResponse:
         user = await User.find_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.m_find_one_by_user(user)
+        user_init = await UserInit.find_one_by_user(user)
 
         if user_init.is_admin:
             message_types = [Message.State.admin_check, Message.State.notice]

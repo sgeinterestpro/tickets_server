@@ -116,7 +116,7 @@ class UserHandles:
 
         user_info = {}
         user = await User.find_or_insert_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.m_find_one_by_user(user)
+        user_init = await UserInit.find_one_by_user(user)
         if user_init is not None:
             user_info.update(user_init.to_json())
         user_info.update(user.to_json())
@@ -224,9 +224,9 @@ class UserHandles:
             return web.json_response({'code': -1, 'message': '请求参数错误'})
 
         user = await User.find_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.m_find_one_by_user(user)
+        user_init = await UserInit.find_one_by_user(user)
 
-        if 'admin' not in user_init['role']:
+        if not user_init.is_admin:
             return web.json_response({'code': -1, 'message': '没有相应权限'})
 
         user_info = {}
