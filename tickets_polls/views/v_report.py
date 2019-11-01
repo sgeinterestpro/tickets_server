@@ -19,8 +19,8 @@ from datetime import datetime
 from aiohttp import web
 from aiohttp.abc import Request, StreamResponse
 
+from base import ReportBase
 from model import User, UserInit
-from u_report import ReportBase
 
 
 class ReportHandles:

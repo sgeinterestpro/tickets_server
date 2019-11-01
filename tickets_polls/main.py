@@ -8,13 +8,10 @@ import logging
 
 from aiohttp import web
 
+from base import setup_database, setup_email, setup_report, setup_task
 from config import setup_config
 from model import setup_model
 from routes import setup_routes, setup_middleware
-from u_database import setup_database
-from u_email import setup_email
-from u_report import setup_report
-from u_task import setup_task
 
 logging.basicConfig(
     format='%(levelname)s: %(asctime)s [%(pathname)s:%(lineno)d] %(message)s',

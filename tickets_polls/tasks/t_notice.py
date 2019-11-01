@@ -19,8 +19,8 @@ from datetime import timedelta, datetime
 
 from aiohttp.abc import Application
 
+from base import ReportUsedDtl
 from model import UserInit, Ticket
-from u_report import ReportUsedDtl
 
 
 async def notice(app: Application) -> None:

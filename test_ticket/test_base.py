@@ -7,7 +7,7 @@ from urllib.parse import quote_plus
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from config import load_config
-from u_email import EmailSender
+from base import EmailSender
 
 
 def date_convert(date, fmt):

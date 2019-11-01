@@ -20,8 +20,8 @@ from aiohttp import web
 from aiohttp.abc import Request, StreamResponse
 from bson import ObjectId
 
+from base import EmailSender
 from model import User, UserInit, Captcha
-from u_email import EmailSender
 from unit import get_sport
 
 

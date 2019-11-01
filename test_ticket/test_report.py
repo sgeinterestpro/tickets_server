@@ -4,7 +4,7 @@ import unittest
 import openpyxl
 
 from test_ticket.test_base import TestBase, async_test, date_convert
-from u_report import ReportBase, ReportUsedDay, ReportUsedMonth, ReportUsedDtl
+from base import ReportBase, ReportUsedDay, ReportUsedMonth, ReportUsedDtl
 
 
 class Report(TestBase):

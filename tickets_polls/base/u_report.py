@@ -25,7 +25,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from model import Ticket, User, UserInit, TicketCheck, TicketLog
-from u_email import EmailSender
+from base.u_email import EmailSender
 from unit import date_month_start, date_month_end, date_show
 
 
@@ -667,7 +667,7 @@ if __name__ == '__main__':
     import pathlib
     import asyncio
     from motor.motor_asyncio import AsyncIOMotorClient
-    from u_email import EmailSender, EmailSender, EmailSender, EmailSender, EmailSender
+    from base.u_email import EmailSender, EmailSender, EmailSender, EmailSender, EmailSender
     from config import load_config
     from urllib.parse import quote_plus
 
