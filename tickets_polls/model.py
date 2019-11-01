@@ -271,7 +271,6 @@ class UserInit(Model):
         'department',
         'email',
         'phone',
-        'work_no',
         'sports',
         'role'
     ]
@@ -280,13 +279,8 @@ class UserInit(Model):
         'role': []
     }
 
-    @property
-    def is_admin(self) -> bool:
-        return 'admin' in self['role']
-
-    @property
-    def is_checker(self) -> bool:
-        return 'checker' in self['role']
+    def role_check(self, role) -> bool:
+        return role in self['role']
 
     @staticmethod
     async def find_one_by_user(user: User):

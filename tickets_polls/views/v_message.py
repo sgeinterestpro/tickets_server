@@ -17,17 +17,15 @@ import pymongo
 from aiohttp import web
 from aiohttp.abc import Request, StreamResponse
 
-from model import User, Message, Ticket, UserInit
+from middleware import Auth, auth_need
+from model import User, Message, Ticket
 
 
 class MessageHandles:
     @staticmethod
+    @auth_need(Auth.role)
     async def message_count(request: Request) -> StreamResponse:
-
-        user = await User.find_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.find_one_by_user(user)
-
-        if user_init.is_admin:
+        if request['user_init'].role_check('admin'):
             message_types = [Message.State.admin_check, Message.State.notice]
         else:
             message_types = [Message.State.notice]
@@ -41,11 +39,9 @@ class MessageHandles:
         return web.json_response({'code': 0, 'message': '获取成功', 'count': count})
 
     @staticmethod
+    @auth_need(Auth.role)
     async def message_list(request: Request) -> StreamResponse:
-        user = await User.find_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.find_one_by_user(user)
-
-        if user_init.is_admin:
+        if request['user_init'].role_check('admin'):
             message_types = [Message.State.admin_check, Message.State.notice]
         else:
             message_types = [Message.State.notice]
@@ -63,13 +59,11 @@ class MessageHandles:
         return web.json_response({'code': 0, 'message': '获取成功', 'count': len(message_list), 'items': message_list})
 
     @staticmethod
+    @auth_need(Auth.role)
     async def message_action(request: Request) -> StreamResponse:
-
         data = await request.json()
         if 'message_id' not in data or not data['message_id']:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
-
-        checker = await User.find_one({'wx_open_id': request['open-id']})
 
         message = await Message.find_one({'_id': data['message_id'], 'state': 'valid'})
         if message is None:
@@ -78,12 +72,12 @@ class MessageHandles:
         operator = await User.find_one({'_id': message['operator']})
         if operator is None:
             _ = await Message.update_one({'_id': message.mongo_id}, {'$set': {
-                'checker': checker.mongo_id,
+                'checker': request['user'].mongo_id,
                 'state': 'fail'
             }})
             return web.json_response({'code': -1, 'message': '操作发起者已注销', 'data': data})
 
-        if checker == operator:
+        if request['user'] == operator:
             return web.json_response({'code': -1, 'message': '不能由操作发起者执行复核操作', 'data': data})
 
         if message['operation'] == 'ticket_generate':
@@ -94,7 +88,7 @@ class MessageHandles:
                 return web.json_response({'code': -3, 'message': '票券增发成功'})
             # 更新消息状态
             _ = await Message.update_one({'_id': message.mongo_id}, {'$set': {
-                'checker': checker.mongo_id,
+                'checker': request['user'].mongo_id,
                 'state': 'success'
             }})
 

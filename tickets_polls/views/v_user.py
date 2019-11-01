@@ -21,6 +21,7 @@ from aiohttp.abc import Request, StreamResponse
 from bson import ObjectId
 
 from base import EmailSender
+from middleware import Auth, auth_need
 from model import User, UserInit, Captcha
 from unit import get_sport
 
@@ -113,7 +114,6 @@ class UserHandles:
 
     @staticmethod
     async def user_info(request: Request) -> StreamResponse:
-
         user_info = {}
         user = await User.find_or_insert_one({'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one_by_user(user)
@@ -125,10 +125,10 @@ class UserHandles:
 
     @staticmethod
     async def user_update(request: Request) -> StreamResponse:
-
         data = await request.json()
         if 'userInfo' not in data:
             return web.json_response({'code': -2, 'message': '用户信息不存在'})
+
         user = await User.find_or_insert_one({'wx_open_id': request['open-id']})
         _ = await User.update_one(user.to_object(), {
             '$set': data['userInfo']
@@ -136,12 +136,11 @@ class UserHandles:
         return web.json_response({'code': 0, 'message': '同步用户信息成功'})
 
     @staticmethod
+    @auth_need(Auth.weapp)
     async def user_bind(request: Request) -> StreamResponse:
-
-        user = await User.find_one({'wx_open_id': request['open-id']})
         data = await request.json()
 
-        if user['init_id']:
+        if request['user']['init_id']:
             return web.json_response({'code': -1, 'message': '该微信已经绑定了其他邮箱'})
 
         user_init = await UserInit.find_one({'email': data['email']})
@@ -159,7 +158,7 @@ class UserHandles:
         _ = await Captcha.insert_one({
             'captcha': random_code,
             'email': data['email'],
-            'user_id': user.mongo_id,
+            'user_id': request['user'].mongo_id,
             'url': final_url,
             'expire_time': datetime.utcnow()
         })
@@ -176,20 +175,19 @@ class UserHandles:
             return web.json_response({'code': -3, 'message': '邮件服务器繁忙'})
 
     @staticmethod
+    @auth_need(Auth.admin)
     async def member_add(request: Request) -> StreamResponse:
 
         data = await request.json()
 
         if 'real_name' not in data or not data['real_name']:
-            return web.json_response({'code': -2, 'message': '姓名不能为空'})
-        if 'work_no' not in data or not data['work_no']:
-            return web.json_response({'code': -2, 'message': '工号不能为空'})
+            return web.json_response({'code': -2, 'message': '用户姓名不能为空'})
         if 'email' not in data or not data['email']:
             return web.json_response({'code': -2, 'message': '电子邮件不能为空'})
         if 'phone' not in data or not data['phone']:
             return web.json_response({'code': -2, 'message': '手机号码不能为空'})
-        if 'sports' not in data or not data['sports']:
-            return web.json_response({'code': -2, 'message': '运动项目不能为空'})
+        # if 'sports' not in data or not data['sports']:
+        #     return web.json_response({'code': -2, 'message': '运动项目不能为空'})
         if 'role' not in data or not data['role']:
             return web.json_response({'code': -2, 'message': '用户角色不能为空'})
 
@@ -200,14 +198,13 @@ class UserHandles:
         return web.json_response({'code': 0, 'message': '添加用户成功'})
 
     @staticmethod
+    @auth_need(Auth.admin)
     async def member_delete(request: Request) -> StreamResponse:
-
         data = await request.json()
         if 'init_id' not in data:
             return web.json_response({'code': -1, 'message': '请求参数错误'})
 
-        user = await User.find_one({'wx_open_id': request['open-id']})
-        if data['init_id'] == str(user['init_id']):
+        if data['init_id'] == str(request['user']['init_id']):
             return web.json_response({'code': -1, 'message': '无法删除正在使用的账号'})
 
         res = await UserInit.delete_one({'_id': ObjectId(data['init_id'])})
@@ -217,35 +214,27 @@ class UserHandles:
         return web.json_response({'code': 0, 'message': '删除用户成功'})
 
     @staticmethod
+    @auth_need(Auth.admin)
     async def member_find(request: Request) -> StreamResponse:
-
         data = await request.json()
         if 'init_id' not in data:
             return web.json_response({'code': -1, 'message': '请求参数错误'})
 
-        user = await User.find_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.find_one_by_user(user)
-
-        if not user_init.is_admin:
-            return web.json_response({'code': -1, 'message': '没有相应权限'})
-
         user_info = {}
-
-        t_user_init = await UserInit.find_one({'_id': ObjectId(data['init_id'])})
-
-        t_user = await User.find_one({'init_id': t_user_init.mongo_id})
-        if t_user is not None:
-            user_info.update(t_user.to_json())
+        user_init = await UserInit.find_one({'_id': ObjectId(data['init_id'])})
+        user = await User.find_one({'init_id': user_init.mongo_id})
+        if user is not None:
+            user_info.update(user.to_json())
             user_info['user_id'] = user_info.pop('_id')
 
-        user_info.update(t_user_init.to_json())
+        user_info.update(user_init.to_json())
         user_info['init_id'] = user_info.pop('_id')
 
         return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user_info})
 
     @staticmethod
+    @auth_need(Auth.admin)
     async def member_list(request: Request) -> StreamResponse:
-
         cursor = UserInit.find()
 
         count, items = 0, []

@@ -20,11 +20,13 @@ from aiohttp import web
 from aiohttp.abc import Request, StreamResponse
 
 from base import ReportBase
+from middleware import auth_need, Auth
 from model import User, UserInit
 
 
 class ReportHandles:
     @staticmethod
+    @auth_need(Auth.admin)
     async def report_export(request: Request) -> StreamResponse:
 
         data = await request.json()
