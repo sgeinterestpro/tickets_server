@@ -13,6 +13,7 @@
 @Desc    : 
     
 """
+import aiohttp
 from aiohttp import web
 from aiohttp.abc import Request, StreamResponse
 from cryptography.hazmat.primitives import serialization
@@ -36,3 +37,20 @@ class SystemHandles:
     @staticmethod
     async def system_config(request: Request) -> StreamResponse:
         return web.Response(text='')
+
+
+class WeiXinHandles:
+    @staticmethod
+    async def login(request: Request) -> StreamResponse:
+        data = await request.json()
+        weixin_config = request.app['config'].get('weixin', {})
+        params = [
+            ('appid', weixin_config.get('appid', '')),
+            ('secret', weixin_config.get('secret', '')),
+            ('js_code', data.get('js_code', '')),
+            ('grant_type', 'authorization_code'),
+        ]
+        async with aiohttp.ClientSession() as session:
+            async with session.get('https://api.weixin.qq.com/sns/jscode2session', params=params) as resp:
+                text = await resp.text()
+        return web.Response(status=resp.status, reason=resp.reason, text=text)
