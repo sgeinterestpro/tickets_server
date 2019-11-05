@@ -24,12 +24,6 @@ class Auth:
 @middleware
 async def auth_middleware(request: Request, handler: Callable[[Request], Awaitable[StreamResponse]]) -> StreamResponse:
     request['open-id'] = request.headers.get('open-id', '')
-    # if request.rel_url.parts[1] != 'web':
-    #     if not request.headers.get('open-id'):
-    #         return HTTPForbidden()
-    #     request['open-id'] = request.headers.get('open-id', '')
-    #     request['user'] = await User.find_one({'wx_open_id': request['open-id']})
-    #     request['user_init'] = await UserInit.find_one_by_user(request['user'])
     resp = await handler(request)
     return resp
 
