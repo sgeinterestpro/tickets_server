@@ -132,7 +132,7 @@ class Model(object):
         return await Model._db[cls.collection_name].insert_many(*args, **kwargs)
 
     @classmethod
-    async def update_many(cls, *args, **kwargs) -> Awaitable[UpdateResult]:
+    async def update_many(cls, *args, **kwargs) -> UpdateResult:
         return await Model._db[cls.collection_name].update_many(*args, **kwargs)
 
     @classmethod

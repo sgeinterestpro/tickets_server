@@ -16,6 +16,7 @@
 import logging
 from datetime import datetime, timedelta
 from io import BytesIO
+from typing import List
 
 import openpyxl
 from aiohttp.abc import Application
@@ -24,8 +25,8 @@ from openpyxl.styles import Border, Side, Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
-from model import Ticket, User, UserInit, TicketCheck, TicketLog
 from base.u_email import EmailSender
+from model import Ticket, User, UserInit, TicketCheck, TicketLog
 from unit import date_month_start, date_month_end, date_show
 
 
@@ -121,7 +122,7 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
     async def write_wb(self, wb: Workbook):
         pass
 
-    async def send(self, email_addr: str):
+    async def send(self, email_addr: List[str]):
         attachs = await self.get_attachs()
         await self.sender.send(email_addr, self._email_subject, self._mail_msg, attachs)
 
