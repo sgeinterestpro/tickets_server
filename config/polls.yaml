@@ -1,0 +1,29 @@
+server:
+  host: '127.0.0.1'
+  port: 0
+database:
+  host: '127.0.0.1'
+  port: 0
+  name: 'ticket'
+  user: ''
+  pass: ''
+email:
+  charset: ''
+  sender: ''
+  servers: ''
+ticket:
+  sport:
+    badminton: '羽毛球'
+    basketball: '篮球'
+    football: '足球'
+    swim: '游泳'
+    yoga: '瑜伽'
+  state:
+    default: '库存'
+    valid: '已领出'
+    verified: '已使用'
+    expired: '已过期'
+    delete: '已删除'
+weixin:
+  appid: ''
+  secret: ''
