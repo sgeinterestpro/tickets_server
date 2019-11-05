@@ -14,6 +14,8 @@ from pymongo.results import UpdateResult, InsertManyResult, DeleteResult, Insert
 
 
 def setup_model(app: Application) -> None:
+    if 'db' not in app:
+        raise Exception('需要初始化数据库')
     Model._db = app['db']
 
 

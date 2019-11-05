@@ -11,6 +11,8 @@ from pymongo import MongoClient
 
 
 def setup_database(app: Application) -> None:
+    if 'config' not in app:
+        raise Exception('需要初始化配置参数')
     conf = app['config']
     uri = 'mongodb://'
     if conf['database']['user'] != '':

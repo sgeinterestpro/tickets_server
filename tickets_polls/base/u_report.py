@@ -30,9 +30,15 @@ from unit import date_month_start, date_month_end, date_show
 
 
 def setup_report(app: Application) -> None:
-    ReportBase.sender = app['email']
-    ReportBase.db = app['db']
+    if 'config' not in app:
+        raise Exception('需要初始化配置参数')
+    if 'db' not in app:
+        raise Exception('需要初始化数据库模块')
+    if 'email' not in app:
+        raise Exception('需要初始化邮件模块')
     ReportBase.config = app['config']
+    ReportBase.db = app['db']
+    ReportBase.sender = app['email']
 
     app['report'] = {
         'ReportUsedDtl': ReportUsedDtl,  # 领用登记明细表

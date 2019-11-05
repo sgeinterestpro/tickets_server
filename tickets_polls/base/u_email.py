@@ -16,6 +16,8 @@ from aiohttp.abc import Application
 
 
 def setup_email(app: Application) -> None:
+    if 'config' not in app:
+        raise Exception('需要初始化配置参数')
     EmailSender.charset = app['config']['email']['charset']
     EmailSender.sender = app['config']['email']['sender']
     app['email'] = EmailSender
