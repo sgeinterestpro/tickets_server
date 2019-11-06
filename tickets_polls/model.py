@@ -26,15 +26,15 @@ class ModelCursor(object):
     def __init__(self, cls: type, cursor: AsyncIOMotorCursor):
         self.cls = cls
         self.cursor = cursor
+        self.aiter = None
 
     def __aiter__(self):
+        self.aiter = self.cursor.__aiter__()
         return self
 
     async def __anext__(self) -> 'Model':
-        async for doc in self.cursor:
-            return self.cls(**(doc or {}))
-        else:
-            raise StopAsyncIteration
+        doc = await self.aiter.__anext__()
+        return self.cls(**(doc or {}))
 
     def sort(self, *args, **kwargs) -> 'ModelCursor':
         return ModelCursor(self.cls, self.cursor.sort(*args, **kwargs))
@@ -73,7 +73,7 @@ class Model(object):
         return self.__setattr__('_{}'.format(key), value)
 
     def get(self, key, default=None):
-        return self[key] if key in self else default
+        return self[key] if key in self.fled_list else default
 
     @property
     def mongo_id(self) -> Optional[ObjectId]:
@@ -193,6 +193,7 @@ class Message(Model):
         'params',
         'state',
         'time',
+        'type',
     ]
     fled_default = {
         'state': 'default'
@@ -228,13 +229,25 @@ class Ticket(Model):
 
 class TicketCheck(Model):
     collection_name = 'ticket_check'
-    fled_list = []
+    fled_list = [
+        'checked_date',
+        'check_time',
+        'all',
+        'default',
+        'valid',
+        'verified',
+        'expired',
+        'delete'
+    ]
     fled_default = {}
 
 
 class TicketLog(Model):
     collection_name = 'ticket_log'
-    fled_list = []
+    fled_list = [
+        'init_id',
+        'option',
+        'ticket_id']
     fled_default = {}
 
 
@@ -251,8 +264,7 @@ class User(Model):
         'province',
         'init_id'
     ]
-    fled_default = {
-    }
+    fled_default = {}
 
     @staticmethod
     async def find_or_insert_one(data):
@@ -270,6 +282,7 @@ class UserInit(Model):
     collection_name = 'user_init'
     fled_list = [
         'real_name',
+        'work_no',
         'department',
         'email',
         'phone',

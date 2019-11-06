@@ -417,21 +417,18 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
 
     async def sheet_day_check(self, sheet: Worksheet, date_start: str, date_end: str):
         sheet.row_dimensions[1].hight = 28.5
-        sheet.merge_cells('A1:G1')
+        sheet.merge_cells('A1:D1')
         style_title(sheet.cell(1, 1, '运动券使用明细表'))
         # 写入报表日期
         sheet.row_dimensions[2].hight = 28.5
-        sheet.merge_cells('A2:G2')
+        sheet.merge_cells('A2:D2')
         style_title(sheet.cell(2, 1, f'导出时间：{datetime.now().strftime("%Y-%m-%d %H:%M")}'))
         # 写入数据列标题
         for index, (head, width) in enumerate([
             ('统计日期', 21),
             ('票券总量', 10),
             ('未使用量', 10),
-            ('已领取量', 10),
-            ('已使用量', 10),
-            ('已过期量', 10),
-            ('已删除量', 10)
+            ('已使用量', 10)
         ]):
             sheet.column_dimensions[get_column_letter(index + 1)].width = width
             style_body(sheet.cell(3, index + 1, head))
@@ -446,12 +443,8 @@ p {{ margin-Top: 0px; margin-Bottom: 0px }}
             style_body(sheet.cell(now_row, 1, ticket_check.get('checked_date')))  # 统计日期
             style_body(sheet.cell(now_row, 2, ticket_check.get('all')))  # 票券总量
             style_body(sheet.cell(now_row, 3, ticket_check.get('default')))  # 未使用量
-            style_body(sheet.cell(now_row, 4, ticket_check.get('valid')))  # 已领取量
-            style_body(sheet.cell(now_row, 5, ticket_check.get('verified')))  # 已使用量
-            style_body(sheet.cell(now_row, 6, ticket_check.get('expired')))  # 已过期量
-            style_body(sheet.cell(now_row, 7, ticket_check.get('delete')))  # 已删除量
+            style_body(sheet.cell(now_row, 4, ticket_check.get('verified')))  # 已使用量
             index += 1
-
 
 class ReportUsedDtl(ReportBase):
     _email_subject = '运动券领用登记明细表'
@@ -599,14 +592,14 @@ if __name__ == '__main__':
     from base.u_email import EmailSender, EmailSender, EmailSender, EmailSender, EmailSender
     from config import load_config
     from urllib.parse import quote_plus
+    from model import Model
 
     uri = 'mongodb://'
-    uri += '{}:{}'.format(quote_plus('sge.ronpy.com'), quote_plus('27017'))
+    uri += '{}:{}'.format(quote_plus('127.0.0.1'), quote_plus('27017'))
     client = AsyncIOMotorClient(uri)
-
-    ReportBase.db = client.get_database('ticket_test')
+    ReportBase.db = Model._db = client.get_database('ticket_test')
     ReportBase.sender = EmailSender
-    ReportBase.config = load_config(str(pathlib.Path('..') / 'config' / 'polls.yaml'))
+    ReportBase.config = load_config(str(pathlib.Path('../..') / 'config' / 'polls.yaml'))
 
 
     async def test():
