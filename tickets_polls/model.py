@@ -282,7 +282,7 @@ class UserInit(Model):
     }
 
     def role_check(self, role) -> bool:
-        return role in self['role']
+        return True if self['role'] == [] and role == 'user' else role in self['role']
 
     @staticmethod
     async def find_one_by_user(user: User):
