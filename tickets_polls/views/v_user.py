@@ -121,7 +121,9 @@ class UserHandles:
             user_info.update(user_init.to_json())
         user_info.update(user.to_json())
         user_info['sports'] = get_sport()
-        user_info['role'] = ['user'] if not user_info['role'] else user_info['role']
+        # 设置默认用户的角色
+        if 'role' in user_info:
+            user_info['role'] = ['user'] if not user_info['role'] else user_info['role']
         return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user_info})
 
     @staticmethod
