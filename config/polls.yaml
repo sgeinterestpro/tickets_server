@@ -20,7 +20,10 @@ ticket:
     yoga: '瑜伽'
   state:
     default: '库存'
+    valid: '已领出'
     verified: '已使用'
+    expired: '已过期'
+    delete: '已删除'
 weixin:
   appid: ''
   secret: ''
