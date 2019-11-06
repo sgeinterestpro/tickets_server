@@ -229,10 +229,11 @@ class UserHandles:
         if user is not None:
             user_info.update(user.to_json())
             user_info['user_id'] = user_info.pop('_id')
-
         user_info.update(user_init.to_json())
         user_info['init_id'] = user_info.pop('_id')
-
+        # 设置默认用户的角色
+        if 'role' in user_info:
+            user_info['role'] = ['user'] if not user_info['role'] else user_info['role']
         return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user_info})
 
     @staticmethod
