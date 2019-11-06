@@ -21,7 +21,7 @@ def get_sport():
     return {
         k: {
             'enable': weekday in v,
-            'message': '' if weekday in v else f'仅限每周{"、".join([str(x) for x in v])}使用'
+            'message': '今日可使用' if weekday in v else f'仅限每周{",".join([str(x) for x in v])}使用'
         }
         for k, v in sport_list.items()
     }
