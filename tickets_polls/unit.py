@@ -7,8 +7,8 @@ author: muumlover
 from datetime import timedelta, datetime
 
 sport_list = {
-    'badminton': [1, 3, 4],
-    'basketball': [1, 3],
+    'badminton': [2, 4, 5],
+    'basketball': [2, 4],
     'football': list(range(1, 8)),
     'swim': [3, 5],
     'yoga': [4],
