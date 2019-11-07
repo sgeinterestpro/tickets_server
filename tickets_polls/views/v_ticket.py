@@ -146,9 +146,9 @@ class TicketHandles:
         # 更新票券信息
         res = await Ticket.update_one({'state': 'default'}, {'$set': new_value})
         if res.matched_count == 0:
-            return web.json_response({'code': -1, 'message': '没有可领取的票券'})
+            return web.json_response({'code': -1, 'message': '票券已被用光，请提醒管理员补充票券'})
         if res.modified_count == 0:
-            return web.json_response({'code': -3, 'message': '更新票券信息失败'})
+            return web.json_response({'code': -3, 'message': '签写票券信息失败'})
 
         # 生成票券使用记录
         new_ticket = await Ticket.find_one(new_value)
