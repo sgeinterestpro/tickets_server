@@ -196,7 +196,7 @@ class Message(Model):
         'type',
     ]
     fled_default = {
-        'state': 'default'
+        'state': 'default',
     }
 
 
@@ -205,22 +205,27 @@ class Ticket(Model):
     fled_list = [
         'class',
         'state',
+        'batch',
         'expiry_date',
         'raiser', 'raise_time',
         'purchaser', 'purch_time',
         'checker', 'check_time',
         'deleter', 'delete_time',
-        'overdue_time'
+        'overdue_time',
     ]
     fled_default = {
-        'state': 'default'
+        'state': 'default',
     }
 
     @staticmethod
     async def generate(raiser, raise_count):
         ticket_id_base = 'SGE_{time}%s'.format(time=datetime.now().strftime('%Y%m%d'))
         raise_time = datetime.now()
+        batch_res = await TicketBatch.insert_one({'raiser': raiser.mongo_id,
+                                                  'raise_time': raise_time,
+                                                  'raise_count': raise_count, })
         new_ticket_list = [Ticket(_id=ticket_id_base % (uuid.uuid1().hex.upper()),
+                                  batch=batch_res.inserted_id,
                                   raiser=raiser.mongo_id,
                                   raise_time=raise_time).to_object(True) for _ in range(raise_count)]
         res = await Ticket.insert_many(new_ticket_list)
@@ -237,7 +242,7 @@ class TicketCheck(Model):
         'valid',
         'verified',
         'expired',
-        'delete'
+        'delete',
     ]
     fled_default = {}
 
@@ -247,7 +252,18 @@ class TicketLog(Model):
     fled_list = [
         'init_id',
         'option',
-        'ticket_id']
+        'ticket_id',
+    ]
+    fled_default = {}
+
+
+class TicketBatch(Model):
+    collection_name = 'ticket_batch'
+    fled_list = [
+        'batch',
+        'raiser',
+        'raise_time',
+    ]
     fled_default = {}
 
 
@@ -262,7 +278,7 @@ class User(Model):
         'language',
         'nickName',
         'province',
-        'init_id'
+        'init_id',
     ]
     fled_default = {}
 
@@ -287,11 +303,11 @@ class UserInit(Model):
         'email',
         'phone',
         'sports',
-        'role'
+        'role',
     ]
     fled_default = {
         'sports': [],
-        'role': []
+        'role': [],
     }
 
     def role_check(self, role) -> bool:
@@ -310,11 +326,11 @@ class Email(Model):
         'user',
         'pass',
         'limit',
-        'used'
+        'used',
     ]
     fled_default = {
         'limit': 0,
-        'used': 0
+        'used': 0,
     }
 
     @staticmethod
