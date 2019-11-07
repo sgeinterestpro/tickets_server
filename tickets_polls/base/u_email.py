@@ -30,6 +30,16 @@ def rfc2047(s, charset='utf-8', language=None):
     return "=?%s?b?%s?=" % (charset, s)
 
 
+class EmailContext:
+    subject = None
+    message = None
+    attach = None
+
+    def __init__(self, subject):
+        self.subject = subject
+        pass
+
+
 class EmailSender:
     charset = None
     sender = None

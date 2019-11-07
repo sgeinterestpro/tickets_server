@@ -11,7 +11,7 @@ class Report(TestBase):
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)
         ReportBase.db = self.db
-        ReportBase.sender = self.sender
+        ReportBase._sender = self.sender
         ReportBase.sport_map = self.config.get('ticket', {}).get('sport', {})
         ReportBase.state_map = self.config.get('ticket', {}).get('state', {})
 
