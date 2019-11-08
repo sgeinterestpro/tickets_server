@@ -6,12 +6,13 @@ author: muumlover
 import base64
 from datetime import datetime, timedelta
 
+import pymongo
 from aiohttp import web
 from aiohttp.abc import Request, StreamResponse
 from cryptography.hazmat.primitives.asymmetric import padding
 
 from middleware import auth_need, Auth
-from model import Ticket, User, UserInit, TicketLog, Message
+from model import Ticket, User, UserInit, TicketLog, Message, TicketBatch
 from unit import date_week_start, date_week_end, date_month_start, sport_list
 
 
@@ -362,6 +363,26 @@ class TicketHandles:
                 })
             data[state] = count
         return web.json_response({'code': 0, 'message': '获取票券数量信息成功', 'data': data})
+
+    @staticmethod
+    @auth_need(Auth.admin)
+    async def ticket_batch(request: Request) -> StreamResponse:
+        cursor = TicketBatch.find({}).sort([('raise_time', pymongo.DESCENDING)])
+        count, items = 0, []
+        ticket_batch: TicketBatch
+        async for ticket_batch in cursor:
+            available = await Ticket.count({
+                'state': 'default',
+                'batch': ticket_batch.mongo_id
+            })
+            item = ticket_batch.to_json()
+            item['available'] = available
+            item.pop('raiser')
+            items.append(item)
+            count += 1
+            if available == 0:
+                break
+        return web.json_response({'code': 0, 'message': '获取票券批次列表成功', 'count': count, 'items': items})
 
     @staticmethod
     @auth_need(Auth.admin)

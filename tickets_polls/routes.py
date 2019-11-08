@@ -18,6 +18,7 @@ def setup_routes(app: Application) -> None:
     app.router.add_route('*', '/ticket_checked', TicketHandles.ticket_checked)
     app.router.add_route('*', '/ticket_generate', TicketHandles.ticket_generate)
     app.router.add_route('*', '/ticket_usage', TicketHandles.ticket_usage)
+    app.router.add_route('*', '/ticket_batch', TicketHandles.ticket_batch)
 
     app.router.add_route('*', '/ticket_sign_in', TicketHandles.ticket_sign_in)
 
