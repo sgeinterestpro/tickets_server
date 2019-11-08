@@ -368,13 +368,13 @@ class SheetMaker(object):
         """
         sheet.title = title
         field_title = [
-            ('序号', 5),
-            ('部门', 10),
-            ('姓名', 6.5),
-            ('项目', 6.5),
-            ('票券编号', 23),
-            ('领取时间', 21),
-            ('使用时间', 21)
+            ('序号', 5.5),  # 4.88
+            ('部门', 13),  # 12.38
+            ('姓名', 9),  # 8.38
+            ('项目', 9),  # 8.38
+            ('票券编号', 23),  # 22.38
+            ('使用日期', 12),  # 11.38
+            ('使用时间', 12),  # 11.38
         ]
         row = IncrementCtrl(0)
         set_large_title(sheet, row.next, 1, len(field_title), title)
@@ -395,8 +395,8 @@ class SheetMaker(object):
                 (user_init or {}).get('real_name', '-'),  # 姓名
                 SheetMaker.sport_map.get(ticket.get('class'), '-'),  # 项目
                 ticket.json_id[:20],  # 票券编号
-                ticket.get('purch_time', '-'),  # 领取时间
-                ticket.get('check_time', '-'),  # 使用时间
+                ticket['check_time'].date(),  # 使用日期
+                ticket['check_time'].time(),  # 使用时间
             ])
 
     @staticmethod
