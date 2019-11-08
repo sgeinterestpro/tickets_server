@@ -27,8 +27,8 @@ def get_sport():
     }
 
 
-def date_show(date, fmt):
-    return datetime.strptime(date, "%Y-%m-%d").strftime(fmt)
+def date_fmt_conv(date, fmt_from="%Y-%m-%d", fmt_to="%Y-%m-%d"):
+    return datetime.strptime(date, fmt_from).strftime(fmt_to)
 
 
 def date_week_start(date=None):

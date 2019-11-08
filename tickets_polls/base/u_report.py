@@ -27,7 +27,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from base.u_email import EmailSender, EmailContext
 from model import Ticket, User, UserInit, TicketCheck, TicketBatch
-from unit import date_month_start, date_month_end, date_show
+from unit import date_month_start, date_month_end, date_fmt_conv
 
 
 def setup_report(app: Application) -> None:
@@ -204,19 +204,17 @@ class SheetMaker(object):
         :return:
         """
 
-        async def get_data(date_start, date_end):
+        async def get_data():
             """
             整理数据
-            :param date_start:
-            :param date_end:
             :return:
             """
-            date_start = datetime.strptime(date_start, '%Y-%m-%d')
-            date_end = datetime.strptime(date_end, '%Y-%m-%d')
+            datetime_start = datetime.strptime(start, '%Y-%m-%d')
+            datetime_end = datetime.strptime(end, '%Y-%m-%d')
             month_list = []
-            month_now = datetime(date_start.year, date_start.month, 15)
+            month_now = datetime(datetime_start.year, datetime_start.month, 15)
             month_list.append(month_now)
-            while month_now < datetime(date_end.year, date_end.month, 15):
+            while month_now < datetime(datetime_end.year, datetime_end.month, 15):
                 month_now += timedelta(days=30)
                 month_now += timedelta(days=15 - month_now.day)
                 month_list.append(month_now)
@@ -244,7 +242,7 @@ class SheetMaker(object):
                 _sport_months.append(_sport_month)
             return _sport_months, _sport_all
 
-        sport_months, sport_all = await get_data(start, end)
+        sport_months, sport_all = await get_data()
         sheet.title = title
         field_title = [
             ('年度', 5),
@@ -293,21 +291,21 @@ class SheetMaker(object):
         set_merge_content(sheet, row.now, 1, 2, '合计')
 
     @staticmethod
-    async def sheet_day_count(title: str, sheet: Worksheet, date_start: str, date_end: str):
+    async def sheet_day_count(title: str, sheet: Worksheet, start: str, end: str):
         """
         运动券使用统计日报表
         :param title:
         :param sheet:
-        :param date_start:
-        :param date_end:
+        :param start:
+        :param end:
         :return:
         """
 
         async def get_data():
             _sport_days = {}
             _sport_total = dict(zip(SheetMaker.sport_map.keys(), [0] * len(SheetMaker.sport_map)))
-            datetime_start = datetime.strptime(date_start, '%Y-%m-%d')
-            datetime_end = datetime.strptime(date_end, '%Y-%m-%d')
+            datetime_start = datetime.strptime(start, '%Y-%m-%d')
+            datetime_end = datetime.strptime(end, '%Y-%m-%d')
             for i in range((datetime_end - datetime_start).days + 1):
                 datetime_now = datetime_start + timedelta(days=i)
                 date_now = datetime_now.strftime('%Y-%m-%d')
@@ -315,7 +313,7 @@ class SheetMaker(object):
 
             cursor = Ticket.find({
                 'state': 'verified',
-                'expiry_date': {'$gte': date_start, '$lte': date_end}
+                'expiry_date': {'$gte': start, '$lte': end}
             }).sort('expiry_date')
 
             async for ticket in cursor:
@@ -402,7 +400,7 @@ class SheetMaker(object):
             ])
 
     @staticmethod
-    async def sheet_day_check(title: str, sheet: Worksheet, date_start: str, date_end: str):
+    async def sheet_day_check(title: str, sheet: Worksheet, start: str, end: str):
         sheet.title = title
         field_title = [
             ('统计日期', 21),
@@ -416,7 +414,7 @@ class SheetMaker(object):
         set_field_title(sheet, row.next, field_title)
 
         async for ticket_check in TicketCheck.find({
-            'checked_date': {'$gte': date_start, '$lte': date_end}
+            'checked_date': {'$gte': start, '$lte': end}
         }).sort('checked_date'):
             set_array_content(sheet, row.next, [
                 ticket_check.get('checked_date'),  # 统计日期
@@ -465,8 +463,8 @@ class ReportUsedDtl(ReportBase):
         super().__init__('运动券领用明细日报表')  # 初始化 _email
         if not start:
             raise Exception()
-        self.date = start
-        self._attach_name = '{}_{}.xlsx'.format(self._email.subject, date_show(self.date, "%Y.%m.%d"))
+        self.date = date_fmt_conv(start)
+        self._attach_name = '{}_{}.xlsx'.format(self._email.subject, date_fmt_conv(self.date, fmt_to="%Y.%m.%d"))
         self._email.message = make_body(self._attach_name)
 
     async def attach_attach(self):
@@ -485,27 +483,27 @@ class ReportUsedDay(ReportBase):
         super().__init__('运动券领用统计日报表')
         if not start or not end:
             raise Exception()
-        self.date_start = start
-        self.date_end = end
+        self.start = date_fmt_conv(start)
+        self.end = date_fmt_conv(end)
         self._attach_name = '{}_{}-{}.xlsx'.format(self._email.subject,
-                                                   date_show(self.date_start, "%Y.%m.%d"),
-                                                   date_show(self.date_end, "%Y.%m.%d"))
+                                                   date_fmt_conv(self.start, fmt_to="%Y.%m.%d"),
+                                                   date_fmt_conv(self.end, fmt_to="%Y.%m.%d"))
         self._email.message = make_body(self._attach_name)
 
     async def attach_attach(self):
         attach_data = BytesIO()  # 创建内存IO
 
         wb = openpyxl.Workbook()  # 创建一个文件对象
-        await SheetMaker.sheet_day_count('运动券领用统计日报表', wb.active, self.date_start, self.date_end)  # 输出报表内容
+        await SheetMaker.sheet_day_count('运动券领用统计日报表', wb.active, self.start, self.end)  # 输出报表内容
         cursor = Ticket.find({
             'state': 'verified',
-            'expiry_date': {'$gte': self.date_start, '$lte': self.date_end}
+            'expiry_date': {'$gte': self.start, '$lte': self.end}
         }).sort('expiry_date')
-        date_now = self.date_end
+        date_now = self.end
         async for ticket in cursor:
             if date_now != ticket.get('expiry_date', '-'):
                 date_now = ticket.get('expiry_date', '-')
-                await SheetMaker.sheet_day_dtl(date_now, wb.create_sheet(date_now), date_now)  # 输出报表内容
+                await SheetMaker.sheet_day_dtl('运动券领用明细日报表', wb.create_sheet(date_now), date_now)  # 输出报表内容
         wb.save(attach_data)  # 写出到IO
 
         self._email.attach = (self._attach_name, attach_data)
@@ -517,18 +515,18 @@ class ReportUsedMonth(ReportBase):
         super().__init__('运动券领用统计月报表')
         if not start or not end:
             raise Exception()
-        self.date_start = start
-        self.date_end = end
+        self.start = start
+        self.end = end
         self._attach_name = '{}_{}-{}.xlsx'.format(self._email.subject,
-                                                   date_show(self.date_start, "%Y.%m"),
-                                                   date_show(self.date_end, "%Y.%m"))
+                                                   date_fmt_conv(self.start, fmt_to="%Y.%m"),
+                                                   date_fmt_conv(self.end, fmt_to="%Y.%m"))
         self._email.message = make_body(self._attach_name)
 
     async def attach_attach(self):
         attach_data = BytesIO()  # 创建内存IO
 
         wb = openpyxl.Workbook()  # 创建一个文件对象
-        await SheetMaker.sheet_month_count('运动券领用统计月报表', wb.active, self.date_start, self.date_end)  # 写入Sheet
+        await SheetMaker.sheet_month_count('运动券领用统计月报表', wb.active, self.start, self.end)  # 写入Sheet
         wb.save(attach_data)  # 写出到IO
 
         self._email.attach = (self._attach_name, attach_data)
@@ -540,18 +538,18 @@ class ReportDayCheck(ReportBase):
         super().__init__('运动券勾稽关系统计表')
         if not start or not end:
             raise Exception()
-        self.date_start = start
-        self.date_end = end
+        self.start = date_fmt_conv(start)
+        self.end = date_fmt_conv(end)
         self._attach_name = '{}_{}-{}.xlsx'.format(self._email.subject,
-                                                   date_show(self.date_start, "%Y.%m.%d"),
-                                                   date_show(self.date_end, "%Y.%m.%d"))
+                                                   date_fmt_conv(self.start, fmt_to="%Y.%m.%d"),
+                                                   date_fmt_conv(self.end, fmt_to="%Y.%m.%d"))
         self._email.message = make_body(self._attach_name)
 
     async def attach_attach(self):
         attach_data = BytesIO()  # 创建内存IO
 
         wb = openpyxl.Workbook()  # 创建一个文件对象
-        await SheetMaker.sheet_day_check('勾稽关系统计表', wb.active, self.date_start, self.date_end)  # 输出报表内容
+        await SheetMaker.sheet_day_check('勾稽关系统计表', wb.active, self.start, self.end)  # 输出报表内容
         wb.save(attach_data)  # 写出到IO
 
         self._email.attach = (self._attach_name, attach_data)
