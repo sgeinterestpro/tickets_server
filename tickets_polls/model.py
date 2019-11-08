@@ -218,12 +218,15 @@ class Ticket(Model):
     }
 
     @staticmethod
-    async def generate(raiser, raise_count):
+    async def generate(raiser, raise_count, checker=None):
         ticket_id_base = 'SGE_{time}%s'.format(time=datetime.now().strftime('%Y%m%d'))
+        batch_id = (ticket_id_base % (uuid.uuid1().hex.upper()))[4:20]
         raise_time = datetime.now()
-        batch_res = await TicketBatch.insert_one({'raiser': raiser.mongo_id,
+        batch_res = await TicketBatch.insert_one({'_id': batch_id,
+                                                  'raiser': raiser.mongo_id,
                                                   'raise_time': raise_time,
-                                                  'raise_count': raise_count, })
+                                                  'raise_count': raise_count,
+                                                  'checker': checker, })
         new_ticket_list = [Ticket(_id=ticket_id_base % (uuid.uuid1().hex.upper()),
                                   batch=batch_res.inserted_id,
                                   raiser=raiser.mongo_id,
@@ -260,9 +263,10 @@ class TicketLog(Model):
 class TicketBatch(Model):
     collection_name = 'ticket_batch'
     fled_list = [
-        'batch',
         'raiser',
         'raise_time',
+        'raise_count',
+        'checker',
     ]
     fled_default = {}
 
@@ -315,7 +319,7 @@ class UserInit(Model):
 
     @staticmethod
     async def find_one_by_user(user: User):
-        return await UserInit.find_one({'_id': user['init_id']})
+        return await UserInit.find_one({'_id': user['init_id'] if user else None})
 
 
 class Email(Model):
