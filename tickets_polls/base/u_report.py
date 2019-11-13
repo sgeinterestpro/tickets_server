@@ -46,7 +46,7 @@ def setup_report(app: Application) -> None:
         'ReportUsedMonth': ReportUsedMonth,  # 运动券领用统计月报表
         'ReportDayCheck': ReportDayCheck,  # 运动券勾稽关系统计表
         'ReportTicketDtl': ReportTicketDtl,  # 运动券发行明细表
-        'ReportRaiseDtl': ReportRaiseDtl,  # 运动券发行明细表
+        'ReportRaiseDtl': ReportRaiseDtl,  # 运动券发行记录表
     }
 
 
@@ -144,10 +144,13 @@ class IncrementCtrl:
 
 
 class ReportBase:
+    _title: str = ''
     _sender: EmailSender = None
     _email: EmailContext = None
+    _params: dict = {}
 
     def __init__(self, subject):
+        self._title = subject
         self._email = EmailContext(subject)
 
     async def attach_attach(self):
@@ -159,6 +162,19 @@ class ReportBase:
             return
         await self._sender.send(email_addr, self._email.subject, self._email.message, self._email.attach)
         return self
+
+    @classmethod
+    async def to_json(cls, key):
+        params = await cls._get_params()
+        return {
+            'api': key,
+            'title': cls._title,
+            'params': params,
+        }
+
+    @classmethod
+    async def _get_params(cls):
+        return cls._params
 
 
 class SheetMaker(object):
@@ -459,11 +475,19 @@ class SheetMaker(object):
 
 
 class ReportUsedDtl(ReportBase):
-    def __init__(self, start: str, *args, **kwargs):
-        super().__init__('运动券领用明细日报表')  # 初始化 _email
-        if not start:
-            raise Exception()
-        self.date = date_fmt_conv(start)
+    _title: str = '运动券领用明细日报表'
+    _params: dict = {
+        'date': {
+            'title': '导出日期',
+            'type': 'day'
+        }
+    }
+
+    def __init__(self, date: str, *args, **kwargs):
+        super().__init__(self._title)  # 初始化 _email
+        if not date:
+            raise KeyError()
+        self.date = date_fmt_conv(date)
         self._attach_name = '{}_{}.xlsx'.format(self._email.subject, date_fmt_conv(self.date, fmt_to="%Y.%m.%d"))
         self._email.message = make_body(self._attach_name)
 
@@ -471,7 +495,7 @@ class ReportUsedDtl(ReportBase):
         attach_data = BytesIO()  # 创建内存IO
 
         wb = openpyxl.Workbook()  # 创建一个文件对象
-        await SheetMaker.sheet_day_dtl('运动券领用明细日报表', wb.active, self.date)  # 写入Sheet
+        await SheetMaker.sheet_day_dtl(self._title, wb.active, self.date)  # 写入Sheet
         wb.save(attach_data)  # 写出到IO
 
         self._email.attach = (self._attach_name, attach_data)
@@ -479,10 +503,22 @@ class ReportUsedDtl(ReportBase):
 
 
 class ReportUsedDay(ReportBase):
+    _title: str = '运动券领用统计日报表'
+    _params: dict = {
+        'start': {
+            'title': '导出起始日期',
+            'type': 'day'
+        },
+        'end': {
+            'title': '导出结束日期',
+            'type': 'day'
+        }
+    }
+
     def __init__(self, start: str, end: str, *args, **kwargs):
-        super().__init__('运动券领用统计日报表')
+        super().__init__(self._title)
         if not start or not end:
-            raise Exception()
+            raise KeyError()
         self.start = date_fmt_conv(start)
         self.end = date_fmt_conv(end)
         self._attach_name = '{}_{}-{}.xlsx'.format(self._email.subject,
@@ -494,7 +530,7 @@ class ReportUsedDay(ReportBase):
         attach_data = BytesIO()  # 创建内存IO
 
         wb = openpyxl.Workbook()  # 创建一个文件对象
-        await SheetMaker.sheet_day_count('运动券领用统计日报表', wb.active, self.start, self.end)  # 输出报表内容
+        await SheetMaker.sheet_day_count(self._title, wb.active, self.start, self.end)  # 输出报表内容
         cursor = Ticket.find({
             'state': 'verified',
             'expiry_date': {'$gte': self.start, '$lte': self.end}
@@ -503,7 +539,7 @@ class ReportUsedDay(ReportBase):
         async for ticket in cursor:
             if date_now != ticket.get('expiry_date', '-'):
                 date_now = ticket.get('expiry_date', '-')
-                await SheetMaker.sheet_day_dtl('运动券领用明细日报表', wb.create_sheet(date_now), date_now)  # 输出报表内容
+                await SheetMaker.sheet_day_dtl(self._title, wb.create_sheet(date_now), date_now)  # 输出报表内容
         wb.save(attach_data)  # 写出到IO
 
         self._email.attach = (self._attach_name, attach_data)
@@ -511,10 +547,22 @@ class ReportUsedDay(ReportBase):
 
 
 class ReportUsedMonth(ReportBase):
+    _title: str = '运动券领用统计月报表'
+    _params: dict = {
+        'start': {
+            'title': '导出起始月份',
+            'type': 'month'
+        },
+        'end': {
+            'title': '导出结束月份',
+            'type': 'month'
+        }
+    }
+
     def __init__(self, start: str, end: str, *args, **kwargs):
-        super().__init__('运动券领用统计月报表')
+        super().__init__(self._title)
         if not start or not end:
-            raise Exception()
+            raise KeyError()
         self.start = start
         self.end = end
         self._attach_name = '{}_{}-{}.xlsx'.format(self._email.subject,
@@ -526,7 +574,7 @@ class ReportUsedMonth(ReportBase):
         attach_data = BytesIO()  # 创建内存IO
 
         wb = openpyxl.Workbook()  # 创建一个文件对象
-        await SheetMaker.sheet_month_count('运动券领用统计月报表', wb.active, self.start, self.end)  # 写入Sheet
+        await SheetMaker.sheet_month_count(self._title, wb.active, self.start, self.end)  # 写入Sheet
         wb.save(attach_data)  # 写出到IO
 
         self._email.attach = (self._attach_name, attach_data)
@@ -534,10 +582,22 @@ class ReportUsedMonth(ReportBase):
 
 
 class ReportDayCheck(ReportBase):
+    _title: str = '运动券勾稽关系统计表'
+    _params: dict = {
+        'start': {
+            'title': '导出起始日期',
+            'type': 'day'
+        },
+        'end': {
+            'title': '导出结束日期',
+            'type': 'day'
+        }
+    }
+
     def __init__(self, start: str, end: str, *args, **kwargs):
-        super().__init__('运动券勾稽关系统计表')
+        super().__init__(self._title)
         if not start or not end:
-            raise Exception()
+            raise KeyError()
         self.start = date_fmt_conv(start)
         self.end = date_fmt_conv(end)
         self._attach_name = '{}_{}-{}.xlsx'.format(self._email.subject,
@@ -549,7 +609,7 @@ class ReportDayCheck(ReportBase):
         attach_data = BytesIO()  # 创建内存IO
 
         wb = openpyxl.Workbook()  # 创建一个文件对象
-        await SheetMaker.sheet_day_check('勾稽关系统计表', wb.active, self.start, self.end)  # 输出报表内容
+        await SheetMaker.sheet_day_check(self._title, wb.active, self.start, self.end)  # 输出报表内容
         wb.save(attach_data)  # 写出到IO
 
         self._email.attach = (self._attach_name, attach_data)
@@ -557,10 +617,25 @@ class ReportDayCheck(ReportBase):
 
 
 class ReportTicketDtl(ReportBase):
+    _title: str = '运动券发行明细表'
+
+    @classmethod
+    async def _get_params(cls):
+        ticket_batch_id_list = []
+        ticket_batch: TicketBatch
+        async for ticket_batch in TicketBatch.find():
+            ticket_batch_id_list.append(ticket_batch.json_id)
+        return {
+            "batch": {
+                "title": "发行批次",
+                "values": ticket_batch_id_list
+            }
+        }
+
     def __init__(self, batch: str, *args, **kwargs):
-        super().__init__('运动券发行明细表')
+        super().__init__(self._title)
         if not batch:
-            raise Exception()
+            raise KeyError()
         self.raise_batch = batch
         self._attach_name = '{}_{}.xlsx'.format(self._email.subject, batch)
         self._email.message = make_body(self._attach_name)
@@ -569,7 +644,7 @@ class ReportTicketDtl(ReportBase):
         attach_data = BytesIO()  # 创建内存IO
 
         wb = openpyxl.Workbook()  # 创建一个文件对象
-        await SheetMaker.sheet_ticket_dtl('运动券发行明细表', wb.active, self.raise_batch)  # 输出报表内容
+        await SheetMaker.sheet_ticket_dtl(self._title, wb.active, self.raise_batch)  # 输出报表内容
         wb.save(attach_data)  # 写出到IO
 
         self._email.attach = (self._attach_name, attach_data)
@@ -577,8 +652,10 @@ class ReportTicketDtl(ReportBase):
 
 
 class ReportRaiseDtl(ReportBase):
+    _title: str = '运动券发行记录表'
+
     def __init__(self, *args, **kwargs):
-        super().__init__('运动券发行记录表')
+        super().__init__(self._title)
         self._attach_name = '{}.xlsx'.format(self._email.subject)
         self._email.message = make_body(self._attach_name)
 
@@ -586,7 +663,7 @@ class ReportRaiseDtl(ReportBase):
         attach_data = BytesIO()  # 创建内存IO
 
         wb = openpyxl.Workbook()  # 创建一个文件对象
-        await SheetMaker.sheet_raise_dtl('运动券发行记录表', wb.active)  # 输出报表内容
+        await SheetMaker.sheet_raise_dtl(self._title, wb.active)  # 输出报表内容
         wb.save(attach_data)  # 写出到IO
 
         self._email.attach = (self._attach_name, attach_data)

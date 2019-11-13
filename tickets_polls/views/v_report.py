@@ -28,6 +28,16 @@ from model import User, UserInit
 class ReportHandles:
     @staticmethod
     @auth_need(Auth.admin)
+    async def report_list(request: Request) -> StreamResponse:
+        reports = request.app['report']
+        report_list_test = [await v.to_json(k) for k, v in reports.items()]
+        return web.json_response({
+            'code': 0, 'message': f'报表类型获取成功',
+            'count': len(report_list_test), 'items': report_list_test
+        })
+
+    @staticmethod
+    @auth_need(Auth.admin)
     async def report_export(request: Request) -> StreamResponse:
         try:
             data = await request.json()
@@ -56,11 +66,14 @@ class ReportHandles:
         report_class = reports[report_type]
         # noinspection PyBroadException
         try:
-            report = report_class(**data)  # type: ReportBase
+            report = report_class(**data.get('params', {}))  # type: ReportBase
             await report.send(user_init['email'])
         except smtplib.SMTPDataError as err:
             return web.json_response({'code': -3, 'message': err.smtp_error.decode()})
+        except KeyError as err:
+            logging.exception(err)
+            return web.json_response({'code': -1, 'message': f'请求参数有误'})
         except Exception as err:
             logging.exception(err)
-            return web.json_response({'code': -1, 'message': f'报表生成失败'})
+            return web.json_response({'code': -2, 'message': f'报表生成失败'})
         return web.json_response({'code': 0, 'message': f'报表发送到{user_init["email"]}成功'})
