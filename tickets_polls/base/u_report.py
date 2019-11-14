@@ -374,15 +374,14 @@ class SheetMaker(object):
         ])
 
     @staticmethod
-    async def sheet_day_dtl(title: str, sheet: Worksheet, date: str):
+    async def sheet_day_dtl(sheet: Worksheet, date: str):
         """
         运动券使用统计日明细报表
-        :param title:
         :param sheet:
         :param date:
         :return:
         """
-        sheet.title = title
+        sheet.title = date
         field_title = [
             ('序号', 5.5),  # 4.88
             ('部门', 13),  # 12.38
@@ -393,7 +392,7 @@ class SheetMaker(object):
             ('使用时间', 12),  # 11.38
         ]
         row = IncrementCtrl(0)
-        set_large_title(sheet, row.next, 1, len(field_title), title)
+        set_large_title(sheet, row.next, 1, len(field_title), '运动券使用统计日明细报表')
         set_large_title(sheet, row.next, 1, len(field_title), date)
         set_export_time(sheet, row.next, 1, len(field_title))
         set_field_title(sheet, row.next, field_title)
@@ -495,7 +494,7 @@ class ReportUsedDtl(ReportBase):
         attach_data = BytesIO()  # 创建内存IO
 
         wb = openpyxl.Workbook()  # 创建一个文件对象
-        await SheetMaker.sheet_day_dtl(self._title, wb.active, self.date)  # 写入Sheet
+        await SheetMaker.sheet_day_dtl(wb.active, self.date)  # 写入Sheet
         wb.save(attach_data)  # 写出到IO
 
         self._email.attach = (self._attach_name, attach_data)
@@ -539,7 +538,7 @@ class ReportUsedDay(ReportBase):
         async for ticket in cursor:
             if date_now != ticket.get('expiry_date', '-'):
                 date_now = ticket.get('expiry_date', '-')
-                await SheetMaker.sheet_day_dtl(self._title, wb.create_sheet(date_now), date_now)  # 输出报表内容
+                await SheetMaker.sheet_day_dtl(wb.create_sheet(date_now), date_now)  # 输出报表内容
         wb.save(attach_data)  # 写出到IO
 
         self._email.attach = (self._attach_name, attach_data)
