@@ -70,9 +70,9 @@ class ReportHandles:
             await report.send(user_init['email'])
         except smtplib.SMTPDataError as err:
             return web.json_response({'code': -3, 'message': err.smtp_error.decode()})
-        except KeyError as err:
+        except (KeyError, TypeError) as err:
             logging.exception(err)
-            return web.json_response({'code': -1, 'message': f'请求参数有误'})
+            return web.json_response({'code': -1, 'message': f'请输入正确的导出条件'})
         except Exception as err:
             logging.exception(err)
             return web.json_response({'code': -2, 'message': f'报表生成失败'})
