@@ -565,8 +565,8 @@ class ReportUsedMonth(ReportBase):
         self.start = start
         self.end = end
         self._attach_name = '{}_{}-{}.xlsx'.format(self._email.subject,
-                                                   date_fmt_conv(self.start, fmt_to="%Y.%m"),
-                                                   date_fmt_conv(self.end, fmt_to="%Y.%m"))
+                                                   date_fmt_conv(self.start, fmt_from='%Y-%m', fmt_to="%Y.%m"),
+                                                   date_fmt_conv(self.end, fmt_from='%Y-%m', fmt_to="%Y.%m"))
         self._email.message = make_body(self._attach_name)
 
     async def attach_attach(self):
