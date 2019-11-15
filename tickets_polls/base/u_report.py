@@ -225,8 +225,8 @@ class SheetMaker(object):
             整理数据
             :return:
             """
-            datetime_start = datetime.strptime(start, '%Y-%m-%d')
-            datetime_end = datetime.strptime(end, '%Y-%m-%d')
+            datetime_start = datetime.strptime(start, '%Y-%m')
+            datetime_end = datetime.strptime(end, '%Y-%m')
             month_list = []
             month_now = datetime(datetime_start.year, datetime_start.month, 15)
             month_list.append(month_now)
