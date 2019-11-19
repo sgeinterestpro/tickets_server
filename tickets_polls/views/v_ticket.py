@@ -127,6 +127,18 @@ class TicketHandles:
         if count >= 3:
             return web.json_response({'code': -1, 'message': '已超过本周领取限额'})
 
+        # 检查当日是否已使用过该项目
+        date_now = datetime.now().strftime('%Y-%m-%d')
+        count = await Ticket.count({
+            'class': data['class'],
+            'purchaser': request['user'].mongo_id,
+            'expiry_date': {'$gte': date_now, '$lte': date_now}
+
+        })
+        if count >= 1:
+            return web.json_response({'code': -1, 'message': '本日已打卡该项目，无法重复打卡'})
+
+
         # 检查是否满足星期限制
         weekday = datetime.now().isoweekday()
         if weekday not in sport_list.get(data['class'], []):
