@@ -49,19 +49,14 @@ class EmailSender:
     async def _make_email(to_addrs, subject, mail_msg, attachs):
         logging.debug((to_addrs, subject, mail_msg, attachs))
         charset = EmailSender.charset
-        if isinstance(to_addrs, str):
-            to_addrs = [to_addrs]
-
         if attachs is None:
             message = MIMEText(mail_msg, _subtype='html', _charset=charset)
         else:
             message = MIMEMultipart()
             msg_text = MIMEText(mail_msg, _subtype='html', _charset=charset)
             message.attach(msg_text)
-
             if isinstance(attachs, tuple):
                 attachs = [attachs]
-
             for name, fp in attachs:
                 attachment = MIMEApplication(fp.getvalue(), 'vnd.openxmlformats-officedocument.spreadsheetml.sheet')
                 # 纯英文可用，中文乱码
@@ -72,7 +67,6 @@ class EmailSender:
                 # filename = f'=?{charset}?B?{base64.b64encode(name.encode(charset)).decode()}?='
                 attachment.add_header('Content-Disposition', 'attachment', filename=rfc2047(name, charset))
                 message.attach(attachment)
-
         message['Subject'] = Header(subject, charset=charset).encode()
         message['From'] = f'{rfc2047("票券管理平台", charset)} <{EmailSender.sender}>'
         message['To'] = ';'.join([f'{rfc2047("平台用户", charset)} <{to_addr}>' for to_addr in to_addrs])
@@ -94,20 +88,7 @@ class EmailSender:
                 logging.error(f'服务器 {to_domain} MX 记录解析失败')
 
     @staticmethod
-    async def _try_send_direct(message, to_addrs):
-        try:
-            await EmailSender._send_direct(message, to_addrs)
-        except smtplib.SMTPDataError as err:
-            logging.error(f'邮件投递失败')
-            logging.exception(err)
-            raise smtplib.SMTPDataError(err.smtp_code, err.smtp_error)
-        except Exception as err:
-            logging.error(f'邮件投递失败')
-            logging.exception(err)
-            raise smtplib.SMTPDataError(-1, b'Unknown Error')
-
-    @staticmethod
-    async def _try_send_proxy(message, to_addrs):
+    async def _send_proxy(message, to_addrs):
         for server in EmailSender.servers:
             try:
                 logging.debug('使用邮件服务器：' + server['host'])
@@ -125,6 +106,8 @@ class EmailSender:
 
     @staticmethod
     async def send(to_addrs, subject, mail_msg, attachs=None):
+        if isinstance(to_addrs, str):
+            to_addrs = [to_addrs]
         logging.debug(('邮件收件人：', to_addrs))
         message = await EmailSender._make_email(to_addrs, subject, mail_msg, attachs)
         # with open('send_email.eml', 'wb') as fd:
@@ -132,12 +115,12 @@ class EmailSender:
         #     fd.write(message.as_bytes())
         #     return
         try:
-            await EmailSender._try_send_direct(message, to_addrs)
+            await EmailSender._send_direct(message, to_addrs)
         except Exception as err:
             logging.error(f'邮件直接投递失败')
             logging.exception(err)
             try:
-                await EmailSender._try_send_proxy(message, to_addrs)
+                await EmailSender._send_proxy(message, to_addrs)
             except Exception as err:
                 logging.error(f'邮件中转投递失败')
                 logging.exception(err)
