@@ -81,27 +81,28 @@ class EmailSender:
                 with SmtpDirectServer(to_domain) as smtp_server:
                     send_errs = smtp_server.send_message(message, EmailSender.sender, to_addrs_this)
                     if not send_errs:
-                        logging.debug(f'邮件投递到{to_domain}成功')
+                        logging.debug(f'邮件直接投递到目标服务器{to_domain}成功')
                     else:
-                        logging.error(f'邮件投递到{to_domain}失败')
+                        logging.error(f'邮件直接投递到目标服务器{to_domain}失败')
                         logging.error(send_errs)
             except dns.resolver.NoAnswer:
-                logging.error(f'服务器 {to_domain} MX 记录解析失败')
+                logging.error(f'目标服务器 {to_domain} MX 记录解析失败')
 
     @staticmethod
     async def _send_proxy(message, to_addrs):
         for server in EmailSender.servers:
             try:
-                logging.debug('使用邮件服务器：' + server['host'])
+                logging.debug('使用中转邮件服务器：' + server['host'])
                 with SmtpProxyServer(server['host'], 25, server['user'], server['pass']) as smtp_server:
                     send_errs = smtp_server.sendmail(EmailSender.sender, to_addrs, message.as_string())
                     if not send_errs:
-                        logging.debug('邮件发送成功')
+                        logging.debug('中转邮件发送成功')
                         return
                     else:
-                        logging.error('邮件发送失败')
+                        logging.error('中转邮件发送失败')
                         logging.error(send_errs)
             except Exception as e:
+                logging.fatal('中转邮件发送异常')
                 logging.exception(e)
         raise smtplib.SMTPDataError(-1, b'Unknown Error')
 
