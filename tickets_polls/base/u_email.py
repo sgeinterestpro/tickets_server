@@ -70,6 +70,7 @@ class EmailSender:
         message['Subject'] = Header(subject, charset=charset).encode()
         message['From'] = f'{rfc2047("票券管理平台", charset)} <{EmailSender.sender}>'
         message['To'] = ';'.join([f'{rfc2047("平台用户", charset)} <{to_addr}>' for to_addr in to_addrs])
+        return message
 
     @staticmethod
     async def _send_direct(message, to_addrs):
