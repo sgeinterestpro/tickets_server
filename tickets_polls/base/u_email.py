@@ -76,10 +76,10 @@ class EmailSender:
     async def _send_direct(message, to_addrs):
         to_domain_set = set([to_addr.split('@')[1] for to_addr in to_addrs])
         for to_domain in to_domain_set:
-            send_addrs = [x for x in to_addrs if to_domain in x]
+            to_addrs_this = [x for x in to_addrs if to_domain in x]
             try:
                 with SmtpDirectServer(to_domain) as smtp_server:
-                    send_errs = smtp_server.send_message(message, EmailSender.sender, send_addrs)
+                    send_errs = smtp_server.send_message(message, EmailSender.sender, to_addrs_this)
                     if not send_errs:
                         logging.debug(f'邮件投递到{to_domain}成功')
                     else:
@@ -94,7 +94,7 @@ class EmailSender:
             try:
                 logging.debug('使用邮件服务器：' + server['host'])
                 with SmtpProxyServer(server['host'], 25, server['user'], server['pass']) as smtp_server:
-                    send_errs = smtp_server.sendmail(EmailSender.sender, to_addrs, message)
+                    send_errs = smtp_server.sendmail(EmailSender.sender, to_addrs, message.as_string())
                     if not send_errs:
                         logging.debug('邮件发送成功')
                         return
@@ -134,6 +134,7 @@ class SmtpDirectServer:
         server_addr = mx[0].exchange.to_text()
         logging.debug(f'目标邮件服务器：{server_addr}')
         _server = smtplib.SMTP(server_addr)
+        _server.set_debuglevel(1)
         self.server = _server
 
     def __enter__(self):
@@ -146,6 +147,7 @@ class SmtpDirectServer:
 class SmtpProxyServer:
     def __init__(self, host, port, mail_user, mail_pass):
         _server = smtplib.SMTP(host, port)
+        _server.set_debuglevel(1)
         _server.login(mail_user, mail_pass)
         self.server = _server
 
