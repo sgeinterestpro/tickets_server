@@ -110,7 +110,7 @@ blockquote {{ margin-Top: 0px; margin-Bottom: 0px; margin-Left: 0.5em }}
 ol, ul {{ margin-Top: 0px; margin-Bottom: 0px; list-style-position: inside; }} 
 p {{ margin-Top: 0px; margin-Bottom: 0px }} 
 </style>
-<div style="border-bottom:3px solid #d9d9d9; background:url(http://exmail.qq.com/zh_CN/htmledition/images/domainmail/bizmail_bg.gif) repeat-x 0 1px #FFFFFF;"> 
+<div style="border-bottom:3px solid #d9d9d9;"> 
     <div style="border:1px solid #c8cfda; padding:40px;"> 
         <div> 
             <p>尊敬的用户，您好！<br> <br> </p> 
