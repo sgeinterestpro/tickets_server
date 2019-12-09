@@ -138,7 +138,6 @@ class TicketHandles:
         if count >= 1:
             return web.json_response({'code': -1, 'message': '本日已打卡该项目，无法重复打卡'})
 
-
         # 检查是否满足星期限制
         weekday = datetime.now().isoweekday()
         if weekday not in sport_list.get(data['class'], []):
@@ -486,15 +485,13 @@ class TicketHandles:
                     }
                 }
                 '''
+                real_name = ticket_log_doc.get('init', {}).get('real_name', None)
+                ticket_id = ticket_log_doc.get('ticket_id', None)[:20]
                 items.append({
-                    'option': ticket_log_doc.get('option', None),
                     'time': str(ticket_log_doc['_id'].generation_time.astimezone()),
-                    'ticket_id': ticket_log_doc.get('ticket_id', None),
-                    'ticket_class': ticket_log_doc.get('ticket', {}).get('class', None),
-                    'real_name': ticket_log_doc.get('init', {}).get('real_name', None),
+                    'text': f'{real_name:　<4} 领取{ticket_id}',
                 })
                 count += 1
-
         return web.json_response({'code': 0, 'message': '获取票券记录成功', 'count': count, 'items': items})
 
     @staticmethod
@@ -509,66 +506,24 @@ class TicketHandles:
         except ValueError:
             return web.json_response({'code': -2, 'message': '日期输入错误'})
 
-        cursor = await Ticket.count({})
-        if cursor == 0:
-            return web.json_response({'code': 0, 'message': '获取票券使用记录成功', 'count': 0, 'items': []})
-
-        match = {'$match': {'check_time': {'$gte': date_start, '$lte': date_end}}}
-        # 联合查询用户信息表
-        lookup_user = {
-            '$lookup': {
-                'from': 'user',
-                'localField': 'purchaser',
-                'foreignField': '_id',
-                'as': 'users'
-            }
-        }
-        # 转换查询结果列表为数据对象
-        add_fields = {
-            '$addFields': {
-                'user': {'$arrayElemAt': ['$users', 0]}
-            }
-        }
-        # 联合查询用户工作信息表
-        lookup_real = {
-            '$lookup': {
-                'from': 'user_init',
-                'localField': 'user.init_id',
-                'foreignField': '_id',
-                'as': 'user_inits'
-            }
-        }
-        # 转换查询结果列表为数据对象
-        add_field_real = {
-            '$addFields': {
-                'user_init': {'$arrayElemAt': ['$user_inits', 0]}
-            }
-        }
-        # 删除查询结果
-        project = {'$project': {'users': 0, 'user_inits': 0}}
-        pipeline = [
-            match,
-            lookup_user,
-            add_fields,
-            lookup_real,
-            add_field_real,
-            project
-        ]
-
         count, items = 0, []
         count_all = await Ticket.count({'check_time': {'$gte': date_start, '$lte': date_end}})
         if count_all > 0:
-            cursor = Ticket.aggregate(pipeline)
-            async for ticket_doc in cursor:
-                ticket = Ticket(**ticket_doc)
-                item = ticket.to_json()
-                user = User(**ticket_doc.get('user', {}))
-                if user is not None:
-                    item['user'] = user.to_json()
-                user_init = UserInit(**ticket_doc.get('user_init', {}))
-                if user_init is not None:
-                    item['user_init'] = user_init.to_json()
-                items.append(item)
+            cursor = Ticket.find({
+                'checker': request['user'].mongo_id,
+                'check_time': {'$gte': date_start, '$lte': date_end},
+            })
+            async for ticket in cursor:
+                purchaser_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['purchaser']}))
+                checker_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['checker']}))
+                items.append({
+                    'id': f'票券编号：{ticket.json_id[:20]}',
+                    'user': f'运动人员：{purchaser_init["real_name"]}',
+                    'class': f'运动项目：{ticket.class_name}',
+                    'time': f'检票时间：{ticket["check_time"].strftime("%Y-%m-%d %H:%M:%S")}',
+                    'checker': f'检票人员：{checker_init["real_name"]}',
+                })
                 count += 1
+                pass
 
         return web.json_response({'code': 0, 'message': '获取票券使用记录成功', 'count': count, 'items': items})

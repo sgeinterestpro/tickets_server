@@ -17,6 +17,7 @@ def setup_model(app: Application) -> None:
     if 'db' not in app:
         raise Exception('需要初始化数据库')
     Model._db = app['db']
+    Model._config = app['config']
 
 
 class ModelCursor(object):
@@ -44,6 +45,7 @@ class Model(object):
     """
     数据对象
     """
+    _config = None
     _db = None
     _id = None
     collection_name = None
@@ -216,6 +218,11 @@ class Ticket(Model):
     fled_default = {
         'state': 'default',
     }
+
+    @property
+    def class_name(self):
+        sport_map = self._config.get('ticket', {}).get('sport', {})
+        return sport_map.get(self['class'], '异常项目')
 
     @staticmethod
     async def generate(raiser, raise_count, checker=None):
