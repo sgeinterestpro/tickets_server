@@ -390,6 +390,7 @@ class SheetMaker(object):
             ('票券编号', 23),  # 22.38
             ('使用日期', 12),  # 11.38
             ('使用时间', 12),  # 11.38
+            ('检票员', 9),  # 8.38
         ]
         row = IncrementCtrl(0)
         set_large_title(sheet, row.next, 1, len(field_title), '运动券使用统计日明细报表')
@@ -402,8 +403,8 @@ class SheetMaker(object):
             'state': 'verified',
             'expiry_date': {'$gte': date, '$lte': date}
         }).sort('expiry_date'):
-            user = await User.find_one({'_id': ticket['purchaser']})
-            user_init = await UserInit.find_one({'_id': (user or {}).get('init_id')})
+            user_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['purchaser']}))
+            checker_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['checker']}))
             set_array_content(sheet, row.next, [
                 index.next,  # 序号
                 (user_init or {}).get('department', '-'),  # 部门
@@ -412,6 +413,7 @@ class SheetMaker(object):
                 ticket.json_id[:20],  # 票券编号
                 ticket['check_time'].date(),  # 使用日期
                 ticket['check_time'].time(),  # 使用时间
+                (checker_init or {}).get('real_name', '-'),  # 检票人员
             ])
 
     @staticmethod
