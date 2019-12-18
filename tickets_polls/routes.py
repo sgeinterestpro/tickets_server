@@ -24,6 +24,7 @@ def setup_routes(app: Application) -> None:
 
     app.router.add_route('*', '/ticket_log', TicketHandles.ticket_log)
     app.router.add_route('*', '/ticket_check_log', TicketHandles.ticket_check_log)
+    app.router.add_route('*', '/ticket_check_count', TicketHandles.ticket_check_count)
 
     app.router.add_route('*', '/message_list', MessageHandles.message_list)
     app.router.add_route('*', '/message_count', MessageHandles.message_count)

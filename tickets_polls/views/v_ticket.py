@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 
 from middleware import auth_need, Auth
 from model import Ticket, User, UserInit, TicketLog, Message, TicketBatch
-from unit import date_week_start, date_week_end, date_month_start, sport_list
+from unit import date_week_start, date_week_end, date_month_start, sport_list, date_month_end
 
 
 class TicketHandles:
@@ -489,7 +489,7 @@ class TicketHandles:
                 ticket_id = ticket_log_doc.get('ticket_id', None)[:20]
                 items.append({
                     'time': str(ticket_log_doc['_id'].generation_time.astimezone()),
-                    'text': f'{real_name:　<4} 领取{ticket_id}',
+                    'text': f'{real_name} 领取 {ticket_id}',
                 })
                 count += 1
         return web.json_response({'code': 0, 'message': '获取票券记录成功', 'count': count, 'items': items})
@@ -527,3 +527,57 @@ class TicketHandles:
                 pass
 
         return web.json_response({'code': 0, 'message': '获取票券使用记录成功', 'count': count, 'items': items})
+
+    @staticmethod
+    @auth_need(Auth.checker)
+    async def ticket_check_count(request: Request) -> StreamResponse:
+        data = await request.json()
+        start = data.get('start', datetime.now().strftime('%Y-%m-%d'))
+        end = data.get('end', start)
+        try:
+            date_start = datetime.strptime(start, '%Y-%m-%d')
+            date_end = datetime.strptime(end, '%Y-%m-%d') + timedelta(days=1)
+        except [ValueError, TypeError]:
+            return web.json_response({'code': -2, 'message': '日期输入错误'})
+
+        items = [{
+            'start_': date_week_start(),
+            'end_': date_week_end(),
+            'items': []
+        }, {
+            'start_': date_week_start(datetime.now() - timedelta(days=7)),
+            'end_': date_week_end(datetime.now() - timedelta(days=7)),
+            'items': []
+        }, {
+            'start_': date_month_start(),
+            'end_': date_month_end(),
+            'items': []
+        }, {
+            'start_': date_start,
+            'end_': date_end,
+            'items': []
+        }]
+
+        async for checker_init in UserInit.find({'role': {'$all': ['checker']}}):
+            checker = await User.find_one({'init_id': checker_init.mongo_id})
+
+            for item in items:
+                item['items'].append({
+                    'name': checker_init['real_name'],
+                    'count': await Ticket.count({
+                        'checker': checker.mongo_id,
+                        'check_time': {'$gte': item['start_'], '$lte': item['end_']}
+                    })
+                })
+
+        for item in items:
+            item['count'] = len(item['items'])
+            item['start'] = item.pop('start_').strftime('%Y-%m-%d')
+            item['end'] = item.pop('end_').strftime('%Y-%m-%d')
+
+        return web.json_response({
+            'code': 0,
+            'message': '获取票券使用记录成功',
+            'items': items,
+            'custom': {}
+        })
