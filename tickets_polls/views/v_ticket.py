@@ -498,33 +498,37 @@ class TicketHandles:
     @auth_need(Auth.checker)
     async def ticket_check_log(request: Request) -> StreamResponse:
         data = await request.json()
-        start = data.get('start', datetime.now().strftime('%Y-%m-%d'))
+        start = data.get('start', None)
         end = data.get('end', start)
-        try:
-            date_start = datetime.strptime(start, '%Y-%m-%d')
-            date_end = datetime.strptime(end, '%Y-%m-%d') + timedelta(days=1)
-        except ValueError:
-            return web.json_response({'code': -2, 'message': '日期输入错误'})
-
-        count, items = 0, []
-        count_all = await Ticket.count({'check_time': {'$gte': date_start, '$lte': date_end}})
-        if count_all > 0:
+        if start is not None:
+            try:
+                date_start = datetime.strptime(start, '%Y-%m-%d')
+                date_end = datetime.strptime(end, '%Y-%m-%d') + timedelta(days=1)
+            except ValueError:
+                return web.json_response({'code': -2, 'message': '日期输入错误'})
+            cursor = Ticket.find({
+                'check_time': {'$gte': date_start, '$lte': date_end},
+            })
+        else:
+            date_start = datetime.strptime(datetime.now().strftime('%Y-%m-%d'), '%Y-%m-%d')
+            date_end = datetime.strptime(datetime.now().strftime('%Y-%m-%d'), '%Y-%m-%d') + timedelta(days=1)
             cursor = Ticket.find({
                 'checker': request['user'].mongo_id,
                 'check_time': {'$gte': date_start, '$lte': date_end},
             })
-            async for ticket in cursor:
-                purchaser_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['purchaser']}))
-                checker_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['checker']}))
-                items.append({
-                    'id': f'票券编号：{ticket.json_id[:20]}',
-                    'user': f'运动人员：{purchaser_init["real_name"]}',
-                    'class': f'运动项目：{ticket.class_name}',
-                    'time': f'检票时间：{ticket["check_time"].strftime("%Y-%m-%d %H:%M:%S")}',
-                    'checker': f'检票人员：{checker_init["real_name"]}',
-                })
-                count += 1
-                pass
+
+        count, items = 0, []
+        async for ticket in cursor:
+            purchaser_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['purchaser']}))
+            checker_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['checker']}))
+            items.append({
+                'id': f'票券编号：{ticket.json_id[:20]}',
+                'user': f'运动人员：{purchaser_init["real_name"]}',
+                'class': f'运动项目：{ticket.class_name}',
+                'time': f'检票时间：{ticket["check_time"].strftime("%Y-%m-%d %H:%M:%S")}',
+                'checker': f'检票人员：{checker_init["real_name"]}',
+            })
+            count += 1
 
         return web.json_response({'code': 0, 'message': '获取票券使用记录成功', 'count': count, 'items': items})
 
