@@ -560,7 +560,8 @@ class TicketHandles:
 
         async for checker_init in UserInit.find({'role': {'$all': ['checker']}}):
             checker = await User.find_one({'init_id': checker_init.mongo_id})
-
+            if checker is None:
+                continue
             for item in items:
                 item['items'].append({
                     'name': checker_init['real_name'],
