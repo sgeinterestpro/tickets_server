@@ -26,7 +26,7 @@ setup_middleware(app)
 setup_task(app)
 
 setup_database(app)  # 依赖 config
-setup_model(app)  # 依赖 database
+setup_model(app)  # 依赖 database, config
 
 setup_email(app)  # 依赖 config
 setup_report(app)  # 依赖 config, database, email

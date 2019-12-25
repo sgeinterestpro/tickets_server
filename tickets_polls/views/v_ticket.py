@@ -6,13 +6,14 @@ author: muumlover
 import base64
 from datetime import datetime, timedelta
 
+import pymongo
 from aiohttp import web
 from aiohttp.abc import Request, StreamResponse
 from cryptography.hazmat.primitives.asymmetric import padding
 
 from middleware import auth_need, Auth
-from model import Ticket, User, UserInit, TicketLog, Message
-from unit import date_week_start, date_week_end, date_month_start, sport_list
+from model import Ticket, User, UserInit, TicketLog, Message, TicketBatch
+from unit import date_week_start, date_week_end, date_month_start, sport_list, date_month_end
 
 
 class TicketHandles:
@@ -126,6 +127,17 @@ class TicketHandles:
         if count >= 3:
             return web.json_response({'code': -1, 'message': '已超过本周领取限额'})
 
+        # 检查当日是否已使用过该项目
+        date_now = datetime.now().strftime('%Y-%m-%d')
+        count = await Ticket.count({
+            'class': data['class'],
+            'purchaser': request['user'].mongo_id,
+            'expiry_date': {'$gte': date_now, '$lte': date_now}
+
+        })
+        if count >= 1:
+            return web.json_response({'code': -1, 'message': '本日已打卡该项目，无法重复打卡'})
+
         # 检查是否满足星期限制
         weekday = datetime.now().isoweekday()
         if weekday not in sport_list.get(data['class'], []):
@@ -146,9 +158,9 @@ class TicketHandles:
         # 更新票券信息
         res = await Ticket.update_one({'state': 'default'}, {'$set': new_value})
         if res.matched_count == 0:
-            return web.json_response({'code': -1, 'message': '没有可领取的票券'})
+            return web.json_response({'code': -1, 'message': '票券已被用光，请提醒管理员补充票券'})
         if res.modified_count == 0:
-            return web.json_response({'code': -3, 'message': '更新票券信息失败'})
+            return web.json_response({'code': -3, 'message': '签写票券信息失败'})
 
         # 生成票券使用记录
         new_ticket = await Ticket.find_one(new_value)
@@ -365,6 +377,26 @@ class TicketHandles:
 
     @staticmethod
     @auth_need(Auth.admin)
+    async def ticket_batch(request: Request) -> StreamResponse:
+        cursor = TicketBatch.find({}).sort([('raise_time', pymongo.DESCENDING)])
+        count, items = 0, []
+        ticket_batch: TicketBatch
+        async for ticket_batch in cursor:
+            available = await Ticket.count({
+                'state': 'default',
+                'batch': ticket_batch.mongo_id
+            })
+            item = ticket_batch.to_json()
+            item['available'] = available
+            item.pop('raiser')
+            items.append(item)
+            count += 1
+            if available == 0:
+                break
+        return web.json_response({'code': 0, 'message': '获取票券批次列表成功', 'count': count, 'items': items})
+
+    @staticmethod
+    @auth_need(Auth.admin)
     async def ticket_log(request: Request) -> StreamResponse:
         """
         获取票券记录
@@ -453,89 +485,104 @@ class TicketHandles:
                     }
                 }
                 '''
+                real_name = ticket_log_doc.get('init', {}).get('real_name', None)
+                ticket_id = ticket_log_doc.get('ticket_id', None)[:20]
                 items.append({
-                    'option': ticket_log_doc.get('option', None),
                     'time': str(ticket_log_doc['_id'].generation_time.astimezone()),
-                    'ticket_id': ticket_log_doc.get('ticket_id', None),
-                    'ticket_class': ticket_log_doc.get('ticket', {}).get('class', None),
-                    'real_name': ticket_log_doc.get('init', {}).get('real_name', None),
+                    'text': f'{real_name} 领取 {ticket_id}',
                 })
                 count += 1
-
         return web.json_response({'code': 0, 'message': '获取票券记录成功', 'count': count, 'items': items})
 
     @staticmethod
     @auth_need(Auth.checker)
     async def ticket_check_log(request: Request) -> StreamResponse:
         data = await request.json()
+        start = data.get('start', None)
+        end = data.get('end', start)
+        if start is not None:
+            try:
+                date_start = datetime.strptime(start, '%Y-%m-%d')
+                date_end = datetime.strptime(end, '%Y-%m-%d') + timedelta(days=1)
+            except ValueError:
+                return web.json_response({'code': -2, 'message': '日期输入错误'})
+            cursor = Ticket.find({
+                'check_time': {'$gte': date_start, '$lte': date_end},
+            })
+        else:
+            date_start = datetime.strptime(datetime.now().strftime('%Y-%m-%d'), '%Y-%m-%d')
+            date_end = datetime.strptime(datetime.now().strftime('%Y-%m-%d'), '%Y-%m-%d') + timedelta(days=1)
+            cursor = Ticket.find({
+                'checker': request['user'].mongo_id,
+                'check_time': {'$gte': date_start, '$lte': date_end},
+            })
+
+        count, items = 0, []
+        async for ticket in cursor:
+            purchaser_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['purchaser']}))
+            checker_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['checker']}))
+            items.append({
+                'id': f'票券编号：{ticket.json_id[:20]}',
+                'user': f'运动人员：{purchaser_init["real_name"]}',
+                'class': f'运动项目：{ticket.class_name}',
+                'time': f'检票时间：{ticket["check_time"].strftime("%Y-%m-%d %H:%M:%S")}',
+                'checker': f'检票人员：{checker_init["real_name"]}',
+            })
+            count += 1
+
+        return web.json_response({'code': 0, 'message': '获取票券使用记录成功', 'count': count, 'items': items})
+
+    @staticmethod
+    @auth_need(Auth.checker)
+    async def ticket_check_count(request: Request) -> StreamResponse:
+        data = await request.json()
         start = data.get('start', datetime.now().strftime('%Y-%m-%d'))
         end = data.get('end', start)
         try:
             date_start = datetime.strptime(start, '%Y-%m-%d')
             date_end = datetime.strptime(end, '%Y-%m-%d') + timedelta(days=1)
-        except ValueError:
+        except [ValueError, TypeError]:
             return web.json_response({'code': -2, 'message': '日期输入错误'})
 
-        cursor = await Ticket.count({})
-        if cursor == 0:
-            return web.json_response({'code': 0, 'message': '获取票券使用记录成功', 'count': 0, 'items': []})
+        items = [{
+            'start_': date_week_start(),
+            'end_': date_week_end(),
+            'items': []
+        }, {
+            'start_': date_week_start(datetime.now() - timedelta(days=7)),
+            'end_': date_week_end(datetime.now() - timedelta(days=7)),
+            'items': []
+        }, {
+            'start_': date_month_start(),
+            'end_': date_month_end(),
+            'items': []
+        }, {
+            'start_': date_start,
+            'end_': date_end,
+            'items': []
+        }]
 
-        match = {'$match': {'check_time': {'$gte': date_start, '$lte': date_end}}}
-        # 联合查询用户信息表
-        lookup_user = {
-            '$lookup': {
-                'from': 'user',
-                'localField': 'purchaser',
-                'foreignField': '_id',
-                'as': 'users'
-            }
-        }
-        # 转换查询结果列表为数据对象
-        add_fields = {
-            '$addFields': {
-                'user': {'$arrayElemAt': ['$users', 0]}
-            }
-        }
-        # 联合查询用户工作信息表
-        lookup_real = {
-            '$lookup': {
-                'from': 'user_init',
-                'localField': 'user.init_id',
-                'foreignField': '_id',
-                'as': 'user_inits'
-            }
-        }
-        # 转换查询结果列表为数据对象
-        add_field_real = {
-            '$addFields': {
-                'user_init': {'$arrayElemAt': ['$user_inits', 0]}
-            }
-        }
-        # 删除查询结果
-        project = {'$project': {'users': 0, 'user_inits': 0}}
-        pipeline = [
-            match,
-            lookup_user,
-            add_fields,
-            lookup_real,
-            add_field_real,
-            project
-        ]
+        async for checker_init in UserInit.find({'role': {'$all': ['checker']}}):
+            checker = await User.find_one({'init_id': checker_init.mongo_id})
+            if checker is None:
+                continue
+            for item in items:
+                item['items'].append({
+                    'name': checker_init['real_name'],
+                    'count': await Ticket.count({
+                        'checker': checker.mongo_id,
+                        'check_time': {'$gte': item['start_'], '$lte': item['end_']}
+                    })
+                })
 
-        count, items = 0, []
-        count_all = await Ticket.count({'check_time': {'$gte': date_start, '$lte': date_end}})
-        if count_all > 0:
-            cursor = Ticket.aggregate(pipeline)
-            async for ticket_doc in cursor:
-                ticket = Ticket(**ticket_doc)
-                item = ticket.to_json()
-                user = User(**ticket_doc.get('user', {}))
-                if user is not None:
-                    item['user'] = user.to_json()
-                user_init = UserInit(**ticket_doc.get('user_init', {}))
-                if user_init is not None:
-                    item['user_init'] = user_init.to_json()
-                items.append(item)
-                count += 1
+        for item in items:
+            item['count'] = len(item['items'])
+            item['start'] = item.pop('start_').strftime('%Y-%m-%d')
+            item['end'] = item.pop('end_').strftime('%Y-%m-%d')
 
-        return web.json_response({'code': 0, 'message': '获取票券使用记录成功', 'count': count, 'items': items})
+        return web.json_response({
+            'code': 0,
+            'message': '获取票券使用记录成功',
+            'items': items,
+            'custom': {}
+        })

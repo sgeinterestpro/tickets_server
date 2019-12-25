@@ -17,6 +17,7 @@ def setup_model(app: Application) -> None:
     if 'db' not in app:
         raise Exception('需要初始化数据库')
     Model._db = app['db']
+    Model._config = app['config']
 
 
 class ModelCursor(object):
@@ -26,15 +27,15 @@ class ModelCursor(object):
     def __init__(self, cls: type, cursor: AsyncIOMotorCursor):
         self.cls = cls
         self.cursor = cursor
+        self.aiter = None
 
     def __aiter__(self):
+        self.aiter = self.cursor.__aiter__()
         return self
 
     async def __anext__(self) -> 'Model':
-        async for doc in self.cursor:
-            return self.cls(**(doc or {}))
-        else:
-            raise StopAsyncIteration
+        doc = await self.aiter.__anext__()
+        return self.cls(**(doc or {}))
 
     def sort(self, *args, **kwargs) -> 'ModelCursor':
         return ModelCursor(self.cls, self.cursor.sort(*args, **kwargs))
@@ -44,6 +45,7 @@ class Model(object):
     """
     数据对象
     """
+    _config = None
     _db = None
     _id = None
     collection_name = None
@@ -73,7 +75,7 @@ class Model(object):
         return self.__setattr__('_{}'.format(key), value)
 
     def get(self, key, default=None):
-        return self[key] if key in self else default
+        return self[key] if key in self.fled_list else default
 
     @property
     def mongo_id(self) -> Optional[ObjectId]:
@@ -132,7 +134,7 @@ class Model(object):
         return await Model._db[cls.collection_name].insert_many(*args, **kwargs)
 
     @classmethod
-    async def update_many(cls, *args, **kwargs) -> Awaitable[UpdateResult]:
+    async def update_many(cls, *args, **kwargs) -> UpdateResult:
         return await Model._db[cls.collection_name].update_many(*args, **kwargs)
 
     @classmethod
@@ -193,9 +195,10 @@ class Message(Model):
         'params',
         'state',
         'time',
+        'type',
     ]
     fled_default = {
-        'state': 'default'
+        'state': 'default',
     }
 
 
@@ -204,22 +207,35 @@ class Ticket(Model):
     fled_list = [
         'class',
         'state',
+        'batch',
         'expiry_date',
         'raiser', 'raise_time',
         'purchaser', 'purch_time',
         'checker', 'check_time',
         'deleter', 'delete_time',
-        'overdue_time'
+        'overdue_time',
     ]
     fled_default = {
-        'state': 'default'
+        'state': 'default',
     }
 
+    @property
+    def class_name(self):
+        sport_map = self._config.get('ticket', {}).get('sport', {})
+        return sport_map.get(self['class'], '异常项目')
+
     @staticmethod
-    async def generate(raiser, raise_count):
+    async def generate(raiser, raise_count, checker=None):
         ticket_id_base = 'SGE_{time}%s'.format(time=datetime.now().strftime('%Y%m%d'))
+        batch_id = (ticket_id_base % (uuid.uuid1().hex.upper()))[4:20]
         raise_time = datetime.now()
+        batch_res = await TicketBatch.insert_one({'_id': batch_id,
+                                                  'raiser': raiser.mongo_id,
+                                                  'raise_time': raise_time,
+                                                  'raise_count': raise_count,
+                                                  'checker': checker, })
         new_ticket_list = [Ticket(_id=ticket_id_base % (uuid.uuid1().hex.upper()),
+                                  batch=batch_res.inserted_id,
                                   raiser=raiser.mongo_id,
                                   raise_time=raise_time).to_object(True) for _ in range(raise_count)]
         res = await Ticket.insert_many(new_ticket_list)
@@ -228,13 +244,37 @@ class Ticket(Model):
 
 class TicketCheck(Model):
     collection_name = 'ticket_check'
-    fled_list = []
+    fled_list = [
+        'checked_date',
+        'check_time',
+        'all',
+        'default',
+        'valid',
+        'verified',
+        'expired',
+        'delete',
+    ]
     fled_default = {}
 
 
 class TicketLog(Model):
     collection_name = 'ticket_log'
-    fled_list = []
+    fled_list = [
+        'init_id',
+        'option',
+        'ticket_id',
+    ]
+    fled_default = {}
+
+
+class TicketBatch(Model):
+    collection_name = 'ticket_batch'
+    fled_list = [
+        'raiser',
+        'raise_time',
+        'raise_count',
+        'checker',
+    ]
     fled_default = {}
 
 
@@ -249,10 +289,9 @@ class User(Model):
         'language',
         'nickName',
         'province',
-        'init_id'
+        'init_id',
     ]
-    fled_default = {
-    }
+    fled_default = {}
 
     @staticmethod
     async def find_or_insert_one(data):
@@ -270,23 +309,24 @@ class UserInit(Model):
     collection_name = 'user_init'
     fled_list = [
         'real_name',
+        'work_no',
         'department',
         'email',
         'phone',
         'sports',
-        'role'
+        'role',
     ]
     fled_default = {
         'sports': [],
-        'role': []
+        'role': [],
     }
 
     def role_check(self, role) -> bool:
-        return role in self['role']
+        return True if self['role'] == [] and role == 'user' else role in self['role']
 
     @staticmethod
     async def find_one_by_user(user: User):
-        return await UserInit.find_one({'_id': user['init_id']})
+        return await UserInit.find_one({'_id': user['init_id'] if user else None})
 
 
 class Email(Model):
@@ -297,11 +337,11 @@ class Email(Model):
         'user',
         'pass',
         'limit',
-        'used'
+        'used',
     ]
     fled_default = {
         'limit': 0,
-        'used': 0
+        'used': 0,
     }
 
     @staticmethod

@@ -83,7 +83,7 @@ class MessageHandles:
         if message['operation'] == 'ticket_generate':
             # 执行增发操作
             raise_count = message['params'].get('count', 0)
-            inserted_ids = await Ticket.generate(operator, raise_count)  # 新加的
+            inserted_ids = await Ticket.generate(operator, raise_count, request['user'].mongo_id)  # 新加的
             if len(inserted_ids) == 0:
                 return web.json_response({'code': -3, 'message': '票券增发成功'})
             # 更新消息状态
