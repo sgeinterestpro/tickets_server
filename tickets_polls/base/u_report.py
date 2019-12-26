@@ -374,14 +374,15 @@ class SheetMaker(object):
         ])
 
     @staticmethod
-    async def sheet_day_dtl(sheet: Worksheet, date: str):
+    async def sheet_day_dtl(title: str, sheet: Worksheet, date_list: List[str]):
         """
         运动券使用统计日明细报表
+        :param title:
         :param sheet:
-        :param date:
+        :param date_list:
         :return:
         """
-        sheet.title = date
+        sheet.title = title
         field_title = [
             ('序号', 5.5),  # 4.88
             ('部门', 13),  # 12.38
@@ -393,28 +394,29 @@ class SheetMaker(object):
             ('检票员', 9),  # 8.38
         ]
         row = IncrementCtrl(0)
-        set_large_title(sheet, row.next, 1, len(field_title), '运动券使用统计日明细报表')
-        set_large_title(sheet, row.next, 1, len(field_title), date)
+        set_large_title(sheet, row.next, 1, len(field_title), title)
+        # set_large_title(sheet, row.next, 1, len(field_title), date)
         set_export_time(sheet, row.next, 1, len(field_title))
         set_field_title(sheet, row.next, field_title)
 
         index = IncrementCtrl(0)
-        async for ticket in Ticket.find({
-            'state': 'verified',
-            'expiry_date': {'$gte': date, '$lte': date}
-        }).sort('expiry_date'):
-            user_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['purchaser']}))
-            checker_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['checker']}))
-            set_array_content(sheet, row.next, [
-                index.next,  # 序号
-                (user_init or {}).get('department', '-'),  # 部门
-                (user_init or {}).get('real_name', '-'),  # 姓名
-                SheetMaker.sport_map.get(ticket.get('class'), '-'),  # 项目
-                ticket.json_id[:20],  # 票券编号
-                ticket['check_time'].date(),  # 使用日期
-                ticket['check_time'].time(),  # 使用时间
-                (checker_init or {}).get('real_name', '-'),  # 检票人员
-            ])
+        for date in date_list:
+            async for ticket in Ticket.find({
+                'state': 'verified',
+                'expiry_date': {'$gte': date, '$lte': date}
+            }).sort('expiry_date'):
+                user_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['purchaser']}))
+                checker_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['checker']}))
+                set_array_content(sheet, row.next, [
+                    index.next,  # 序号
+                    (user_init or {}).get('department', '-'),  # 部门
+                    (user_init or {}).get('real_name', '-'),  # 姓名
+                    SheetMaker.sport_map.get(ticket.get('class'), '-'),  # 项目
+                    ticket.json_id[:20],  # 票券编号
+                    ticket['check_time'].date(),  # 使用日期
+                    ticket['check_time'].time(),  # 使用时间
+                    (checker_init or {}).get('real_name', '-'),  # 检票人员
+                ])
 
     @staticmethod
     async def sheet_day_check(title: str, sheet: Worksheet, start: str, end: str):
@@ -496,7 +498,7 @@ class ReportUsedDtl(ReportBase):
         attach_data = BytesIO()  # 创建内存IO
 
         wb = openpyxl.Workbook()  # 创建一个文件对象
-        await SheetMaker.sheet_day_dtl(wb.active, self.date)  # 写入Sheet
+        await SheetMaker.sheet_day_dtl('运动券使用统计日明细报表', wb.active, [self.date])  # 写入Sheet
         wb.save(attach_data)  # 写出到IO
 
         self._email.attach = (self._attach_name, attach_data)
@@ -536,11 +538,12 @@ class ReportUsedDay(ReportBase):
             'state': 'verified',
             'expiry_date': {'$gte': self.start, '$lte': self.end}
         }).sort('expiry_date')
-        date_now = self.end
+        sheet = wb.create_sheet('票券明细')
+        date_list = []
         async for ticket in cursor:
-            if date_now != ticket.get('expiry_date', '-'):
-                date_now = ticket.get('expiry_date', '-')
-                await SheetMaker.sheet_day_dtl(wb.create_sheet(date_now), date_now)  # 输出报表内容
+            if ticket.get('expiry_date', '-') not in date_list:
+                date_list.append(ticket.get('expiry_date', '-'))
+        await SheetMaker.sheet_day_dtl('票券明细', sheet, date_list)  # 输出报表内容
         wb.save(attach_data)  # 写出到IO
 
         self._email.attach = (self._attach_name, attach_data)
