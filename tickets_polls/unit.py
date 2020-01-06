@@ -9,7 +9,7 @@ from datetime import timedelta, datetime
 sport_list = {
     'badminton': [2, 4, 5],
     'basketball': [2, 4],
-    'football': list(range(1, 8)),
+    'football': [1, 2, 3, 4, 5],
     'swim': [3, 5],
     'yoga': [4],
 }
