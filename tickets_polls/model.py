@@ -279,6 +279,9 @@ class TicketBatch(Model):
 
 
 class User(Model):
+    """
+    微信账号
+    """
     collection_name = 'user'
     fled_list = [
         'wx_open_id',
@@ -306,6 +309,9 @@ class User(Model):
 
 
 class UserInit(Model):
+    """
+    人员账号
+    """
     collection_name = 'user_init'
     fled_list = [
         'real_name',
@@ -315,6 +321,7 @@ class UserInit(Model):
         'phone',
         'sports',
         'role',
+        'state',
     ]
     fled_default = {
         'sports': [],
@@ -327,6 +334,16 @@ class UserInit(Model):
     @staticmethod
     async def find_one_by_user(user: User):
         return await UserInit.find_one({'_id': user['init_id'] if user else None})
+
+
+class OperateLog(Model):
+    collection_name = 'operate_log'
+    fled_list = [
+        'operator_id',
+        'option',
+        'param',
+    ]
+    fled_default = {}
 
 
 class Email(Model):

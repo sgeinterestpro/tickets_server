@@ -18,7 +18,8 @@ class Auth:
     user = 'user'
     admin = 'admin'
     checker = 'checker'
-    role = [user, admin, checker]
+    system = 'system'
+    role = [user, admin, checker, system]
 
 
 @middleware
@@ -46,6 +47,8 @@ def auth_need(role=None):
             request['user_init'] = await UserInit.find_one_by_user(request['user'])
             if not request['user_init']:
                 return HTTPForbidden(reason='此接口仅支持已认证用户访问')
+            if request['user_init'].get('state') == 'suspend':
+                return HTTPForbidden(reason='此账户已被管理员停用')
             if role == Auth.role:
                 return await func(request)
 

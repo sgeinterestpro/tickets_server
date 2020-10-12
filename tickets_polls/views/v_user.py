@@ -22,7 +22,7 @@ from bson import ObjectId
 
 from base import EmailSender
 from middleware import Auth, auth_need
-from model import User, UserInit, Captcha
+from model import User, UserInit, Captcha, OperateLog
 from unit import get_sport
 
 
@@ -122,10 +122,100 @@ class UserHandles:
         if res.inserted_id is None:
             return web.json_response({'code': -3, 'message': '保存用户数据失败'})
 
+        _ = await OperateLog.insert_one(
+            {'operator_id': request['user']['init_id'], 'option': 'member_add', 'param': data['init_id']})
+
         return web.json_response({'code': 0, 'message': '添加用户成功'})
 
     @staticmethod
     @auth_need(Auth.admin)
+    async def member_suspend(request: Request) -> StreamResponse:
+        data = await request.json()
+        if 'init_id' not in data:
+            return web.json_response({'code': -1, 'message': '请求参数错误'})
+
+        if data['init_id'] == str(request['user']['init_id']):
+            return web.json_response({'code': -1, 'message': '无法停用正在使用的账号'})
+
+        res = await UserInit.update_one({'_id': ObjectId(data['init_id']), 'state': None}, {'$set': {
+            'state': 'suspend'
+        }})
+        if res.matched_count == 0:
+            return web.json_response({'code': -1, 'message': '未找到对应的用户'})
+        if res.modified_count == 0:
+            return web.json_response({'code': -3, 'message': '修改用户信息失败'})
+
+        _ = await OperateLog.insert_one(
+            {'operator_id': request['user']['init_id'], 'option': 'member_suspend', 'param': data['init_id']})
+
+        return web.json_response({'code': 0, 'message': '停用用户成功'})
+
+    @staticmethod
+    @auth_need(Auth.admin)
+    async def member_resume(request: Request) -> StreamResponse:
+        data = await request.json()
+        if 'init_id' not in data:
+            return web.json_response({'code': -1, 'message': '请求参数错误'})
+
+        if data['init_id'] == str(request['user']['init_id']):
+            return web.json_response({'code': -1, 'message': '无法操作正在使用的账号'})
+
+        res = await UserInit.update_one({'_id': ObjectId(data['init_id']), 'state': 'suspend'}, {'$set': {
+            'state': None
+        }})
+        if res.matched_count == 0:
+            return web.json_response({'code': -1, 'message': '未找到对应的用户'})
+        if res.modified_count == 0:
+            return web.json_response({'code': -3, 'message': '修改用户信息失败'})
+
+        _ = await OperateLog.insert_one(
+            {'operator_id': request['user']['init_id'], 'option': 'member_resume', 'param': data['init_id']})
+
+        return web.json_response({'code': 0, 'message': '恢复用户成功'})
+
+    @staticmethod
+    @auth_need(Auth.admin)
+    async def member_delete_temp(request: Request) -> StreamResponse:
+        """
+        临时替换删除按钮的功能
+        """
+        data = await request.json()
+        if 'init_id' not in data:
+            return web.json_response({'code': -1, 'message': '请求参数错误'})
+
+        if data['init_id'] == str(request['user']['init_id']):
+            return web.json_response({'code': -1, 'message': '无法操作正在使用的账号'})
+
+        user_init = await UserInit.find_one({'_id': ObjectId(data['init_id'])})
+        if user_init.get('state') is None:
+            res = await UserInit.update_one({'_id': ObjectId(data['init_id']), 'state': None}, {'$set': {
+                'state': 'suspend'
+            }})
+            if res.matched_count == 0:
+                return web.json_response({'code': -1, 'message': '未找到对应的用户'})
+            if res.modified_count == 0:
+                return web.json_response({'code': -3, 'message': '修改用户信息失败'})
+
+            _ = await OperateLog.insert_one(
+                {'operator_id': request['user']['init_id'], 'option': 'member_suspend', 'param': data['init_id']})
+
+            return web.json_response({'code': 0, 'message': '停用用户成功'})
+        else:
+            res = await UserInit.update_one({'_id': ObjectId(data['init_id']), 'state': 'suspend'}, {'$set': {
+                'state': None
+            }})
+            if res.matched_count == 0:
+                return web.json_response({'code': -1, 'message': '未找到对应的用户'})
+            if res.modified_count == 0:
+                return web.json_response({'code': -3, 'message': '修改用户信息失败'})
+
+            _ = await OperateLog.insert_one(
+                {'operator_id': request['user']['init_id'], 'option': 'member_resume', 'param': data['init_id']})
+
+            return web.json_response({'code': 0, 'message': '恢复用户成功'})
+
+    @staticmethod
+    @auth_need(Auth.system)
     async def member_delete(request: Request) -> StreamResponse:
         data = await request.json()
         if 'init_id' not in data:
@@ -137,6 +227,9 @@ class UserHandles:
         res = await UserInit.delete_one({'_id': ObjectId(data['init_id'])})
         if res.deleted_count == 0:
             return web.json_response({'code': -3, 'message': '删除用户数据失败'})
+
+        _ = await OperateLog.insert_one(
+            {'operator_id': request['user']['init_id'], 'option': 'member_delete', 'param': data['init_id']})
 
         return web.json_response({'code': 0, 'message': '删除用户成功'})
 
@@ -177,6 +270,9 @@ class UserHandles:
 
             user_info.update(user_init.to_json())
             user_info['init_id'] = user_info.pop('_id')
+
+            if user_info.get('state') == 'suspend':
+                user_info['real_name'] += ' (已停用)'
 
             items.append(user_info)
             count += 1
