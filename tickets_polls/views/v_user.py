@@ -48,6 +48,8 @@ class UserHandles:
         # 设置默认用户的角色
         if 'role' in user_info:
             user_info['role'] = ['user'] if not user_info['role'] else user_info['role']
+        if user_info.get('state') == 'suspend':
+            user_info['real_name'] += ' (已停用)'
         return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user_info})
 
     @staticmethod
