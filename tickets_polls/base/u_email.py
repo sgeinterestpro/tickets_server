@@ -85,11 +85,16 @@ class EmailSender:
                     else:
                         logging.error(f'邮件直接投递到目标服务器{to_domain}失败')
                         logging.error(send_errs)
-            except dns.resolver.NoAnswer:
+                        raise Exception(b'Email send fail in direct mode.', send_errs)
+            except dns.resolver.NoAnswer as e:
                 logging.error(f'目标服务器 {to_domain} MX 记录解析失败')
+                raise e
 
     @staticmethod
     async def _send_proxy(message, to_addrs):
+        if not EmailSender.servers:
+            logging.error(f'可用邮件发送服务器为空')
+            raise Exception(b'Email server is empty.')
         for server in EmailSender.servers:
             try:
                 logging.debug('使用中转邮件服务器：' + server['host'])
@@ -116,11 +121,11 @@ class EmailSender:
         #     logging.debug('邮件已经保存到本地文件')
         #     fd.write(message.as_bytes())
         #     return
+        # noinspection PyBroadException
         try:
             await EmailSender._send_direct(message, to_addrs)
-        except Exception as err:
+        except Exception:
             logging.error(f'邮件直接投递失败')
-            logging.exception(err)
             try:
                 await EmailSender._send_proxy(message, to_addrs)
             except Exception as err:
