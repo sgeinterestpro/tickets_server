@@ -2,7 +2,7 @@ pymongo
 cryptography==3.1.1
 openpyxl==3.0.5
 aiohttp==3.6.3
-APScheduler==3.6.0
+APScheduler==3.6.3
 motor==2.3.0
 PyYAML==5.1.1
 dnspython==2.0.0
