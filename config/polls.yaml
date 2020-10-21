@@ -8,7 +8,7 @@ database:
   user: ""
   pass: ""
 email:
-  charset: ""
+  charset: "gbk"
   sender: ""
   servers: ""
 ticket:
