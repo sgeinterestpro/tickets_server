@@ -30,6 +30,10 @@ class WebHandles:
             return web.Response(text='验证链接已经失效')
 
         user_init = await UserInit.find_one({'email': captcha['email']})
+
+        if user_init.get('state') == 'suspend':
+            return web.Response(text='此账户已被管理员停用')
+
         _ = await User.update_one({
             '_id': captcha['user_id']
         }, {

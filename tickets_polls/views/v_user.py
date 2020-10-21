@@ -76,6 +76,9 @@ class UserHandles:
         if not user_init:
             return web.json_response({'code': -1, 'message': '该邮箱非组织内部人员邮箱'})
 
+        if user_init.get('state') == 'suspend':
+            return web.json_response({'code': -1, 'message': '此账户已被管理员停用'})
+
         count = await User.count({'email': data['email']})
         if count > 0:
             return web.json_response({'code': -1, 'message': '该邮箱已经绑定了其他微信'})
