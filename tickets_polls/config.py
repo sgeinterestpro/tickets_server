@@ -31,7 +31,7 @@ def load_private_key(pem_key, password=None):
 def load_config(config_path):
     with open(config_path, 'r', encoding='utf-8') as f:
         cfg = f.read()
-        config = yaml.load(cfg, Loader=yaml.BaseLoader)  # 用load方法转字典
+        config = yaml.load(cfg, Loader=yaml.FullLoader)  # 用load方法转字典
     return config
 
 

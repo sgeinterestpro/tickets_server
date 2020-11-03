@@ -11,7 +11,6 @@ from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-import dns.resolver
 from aiohttp.abc import Application
 
 
@@ -73,24 +72,6 @@ class EmailSender:
         return message
 
     @staticmethod
-    async def _send_direct(message, to_addrs):
-        to_domain_set = set([to_addr.split('@')[1] for to_addr in to_addrs])
-        for to_domain in to_domain_set:
-            to_addrs_this = [x for x in to_addrs if to_domain in x]
-            try:
-                with SmtpDirectServer(to_domain) as smtp_server:
-                    send_errs = smtp_server.send_message(message, EmailSender.sender, to_addrs_this)
-                    if not send_errs:
-                        logging.debug(f'邮件直接投递到目标服务器{to_domain}成功')
-                    else:
-                        logging.error(f'邮件直接投递到目标服务器{to_domain}失败')
-                        logging.error(send_errs)
-                        raise Exception(b'Email send fail in direct mode.', send_errs)
-            except dns.resolver.NoAnswer as e:
-                logging.error(f'目标服务器 {to_domain} MX 记录解析失败')
-                raise e
-
-    @staticmethod
     async def _send_proxy(message, to_addrs):
         if not EmailSender.servers:
             logging.error(f'可用邮件发送服务器为空')
@@ -98,7 +79,7 @@ class EmailSender:
         for server in EmailSender.servers:
             try:
                 logging.debug('使用中转邮件服务器：' + server['host'])
-                with SmtpProxyServer(server['host'], 25, server['user'], server['pass']) as smtp_server:
+                with SmtpProxyServer(server['host'], server['port'], server['user'], server['pass']) as smtp_server:
                     send_errs = smtp_server.sendmail(EmailSender.sender, to_addrs, message.as_string())
                     if not send_errs:
                         logging.debug('中转邮件发送成功')
@@ -117,42 +98,24 @@ class EmailSender:
             to_addrs = [to_addrs]
         logging.debug(('邮件收件人：', to_addrs))
         message = await EmailSender._make_email(to_addrs, subject, mail_msg, attachs)
-        # with open('send_email.eml', 'wb') as fd:
-        #     logging.debug('邮件已经保存到本地文件')
-        #     fd.write(message.as_bytes())
-        #     return
         # noinspection PyBroadException
         try:
-            await EmailSender._send_direct(message, to_addrs)
-        except Exception:
-            logging.error(f'邮件直接投递失败')
-            try:
-                await EmailSender._send_proxy(message, to_addrs)
-            except Exception as err:
-                logging.error(f'邮件中转投递失败')
-                logging.exception(err)
-                raise smtplib.SMTPDataError(-1, b'Unknown Error')
-
-
-class SmtpDirectServer:
-    def __init__(self, domain):
-        mx = dns.resolver.query(domain, 'MX')
-        server_addr = mx[0].exchange.to_text()
-        logging.debug(f'目标邮件服务器：{server_addr}')
-        _server = smtplib.SMTP(server_addr)
-        _server.set_debuglevel(1)
-        self.server = _server
-
-    def __enter__(self):
-        return self.server
-
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        self.server.quit()
+            await EmailSender._send_proxy(message, to_addrs)
+        except Exception as err:
+            logging.error(f'邮件中转投递失败')
+            logging.exception(err)
+            raise smtplib.SMTPDataError(-1, b'Unknown Error')
 
 
 class SmtpProxyServer:
     def __init__(self, host, port, mail_user, mail_pass):
-        _server = smtplib.SMTP(host, port)
+        if port == 25:
+            _server = smtplib.SMTP(host, port)
+        elif port == 465:
+            _server = smtplib.SMTP_SSL(host, port)
+        else:
+            logging.error(f'错误的端口号[{type(port)}({port})]')
+            raise smtplib.SMTPConnectError(-1, b'SMTP port is only 25, 465')
         _server.set_debuglevel(1)
         _server.login(mail_user, mail_pass)
         self.server = _server

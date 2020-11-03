@@ -17,7 +17,7 @@ def setup_database(app: Application) -> None:
     uri = 'mongodb://'
     if conf['database']['user'] != '':
         uri += '{}:{}@'.format(quote_plus(conf['database']['user']), quote_plus(conf['database']['pass']))
-    uri += '{}:{}'.format(quote_plus(conf['database']['host']), quote_plus(conf['database']['port']))
+    uri += '{}:{}'.format(quote_plus(conf['database']['host']), conf['database']['port'])
     uri += '/{}'.format(quote_plus(conf['database']['name']))
     client = AsyncIOMotorClient(uri)
     app['db'] = client.get_database(quote_plus(conf['database']['name']))
