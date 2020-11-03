@@ -11,7 +11,6 @@ from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-import dns.resolver
 from aiohttp.abc import Application
 
 
@@ -80,7 +79,7 @@ class EmailSender:
         for server in EmailSender.servers:
             try:
                 logging.debug('使用中转邮件服务器：' + server['host'])
-                with SmtpProxyServer(server['host'], 25, server['user'], server['pass']) as smtp_server:
+                with SmtpProxyServer(server['host'], server['port'], server['user'], server['pass']) as smtp_server:
                     send_errs = smtp_server.sendmail(EmailSender.sender, to_addrs, message.as_string())
                     if not send_errs:
                         logging.debug('中转邮件发送成功')
@@ -110,7 +109,13 @@ class EmailSender:
 
 class SmtpProxyServer:
     def __init__(self, host, port, mail_user, mail_pass):
-        _server = smtplib.SMTP(host, port)
+        if port == 25:
+            _server = smtplib.SMTP(host, port)
+        elif port == 465:
+            _server = smtplib.SMTP_SSL(host, port)
+        else:
+            logging.error(f'错误的端口号[{type(port)}({port})]')
+            raise smtplib.SMTPConnectError(-1, b'SMTP port is only 25, 465')
         _server.set_debuglevel(1)
         _server.login(mail_user, mail_pass)
         self.server = _server
