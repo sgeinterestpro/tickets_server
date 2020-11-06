@@ -405,8 +405,8 @@ class SheetMaker(object):
                 'state': 'verified',
                 'expiry_date': {'$gte': date, '$lte': date}
             }).sort('expiry_date'):
-                user_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['purchaser']}))
-                checker_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['checker']}))
+                user_init = await UserInit.find_one({'_id': ticket['purchaser']})
+                checker_init = await UserInit.find_one({'_id': ticket['checker']})
                 set_array_content(sheet, row.next, [
                     index.next,  # 序号
                     (user_init or {}).get('department', '-'),  # 部门
@@ -462,10 +462,8 @@ class SheetMaker(object):
         index = IncrementCtrl(0)
         ticket_batch: TicketBatch
         async for ticket_batch in TicketBatch.find({}).sort([('raise_time', pymongo.DESCENDING)]):
-            raiser = await User.find_one({'_id': ticket_batch['raiser']})
-            raiser_init = await UserInit.find_one_by_user(raiser)
-            checker = await User.find_one({'_id': ticket_batch['checker']})
-            checker_init = await UserInit.find_one_by_user(checker)
+            raiser_init = await UserInit.find_one({'_id': ticket_batch['raiser']})
+            checker_init = await UserInit.find_one({'_id': ticket_batch['checker']})
             set_array_content(sheet, row.next, [
                 index.next,  # 序号
                 ticket_batch.json_id,  # 发布批次

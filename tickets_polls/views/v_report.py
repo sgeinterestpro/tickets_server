@@ -60,8 +60,7 @@ class ReportHandles:
         #     except ValueError:
         #         return web.json_response({'code': -1, 'message': '请选择正确的日期'})
 
-        user = await User.find_one({'wx_open_id': request['open-id']})
-        user_init = await UserInit.find_one_by_user(user)
+        user_init = await UserInit.find_one({'wx_open_id': request['open-id']})
 
         report_class = reports[report_type]
         # noinspection PyBroadException
