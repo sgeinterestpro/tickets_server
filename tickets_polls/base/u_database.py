@@ -30,12 +30,13 @@ def config_database(uri: str, db_name: str) -> None:
     # db.captcha.create_index('expire_time', expireAfterSeconds=3600)
     # noinspection PyBroadException
 
-    # 设置验证码表数据过期时间
-    try:
-        db.captcha.drop_index('expire_time_1')
-    except Exception:
-        pass
-    db.captcha.create_index('expire_time', expireAfterSeconds=600)
+    captcha_index = db.captcha.index_information()
+    if 'expire_time_1' not in captcha_index:
+        db.captcha.create_index('expire_time', expireAfterSeconds=600)
+
+    user_init_index = db.user_init.index_information()
+    if 'email_1' not in user_init_index:
+        db.user_init.create_index('email', unique=True)
 
     client.close()
     pass
