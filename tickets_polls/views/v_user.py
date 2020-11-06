@@ -123,6 +123,10 @@ class UserHandles:
         if 'role' not in data or not data['role']:
             return web.json_response({'code': -2, 'message': '用户角色不能为空'})
 
+        count = await UserInit.count({'email': data['email']})
+        if count > 0:
+            return web.json_response({'code': -2, 'message': '电子邮件所对应的用户已存在'})
+
         res = await UserInit.insert_one(data)
         if res.inserted_id is None:
             return web.json_response({'code': -3, 'message': '保存用户数据失败'})
