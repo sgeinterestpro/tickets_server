@@ -128,7 +128,7 @@ class UserHandles:
             return web.json_response({'code': -3, 'message': '保存用户数据失败'})
 
         _ = await OperateLog.insert_one(
-            {'operator_id': request['user']['init_id'], 'option': 'member_add', 'param': data['init_id']})
+            {'operator_id': request['user']['init_id'], 'option': 'member_add', 'param': res.inserted_id})
 
         return web.json_response({'code': 0, 'message': '添加用户成功'})
 
