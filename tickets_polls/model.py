@@ -202,6 +202,40 @@ class Message(Model):
     }
 
 
+class Sport(Model):
+    collection_name = 'sport'
+    fled_list = [
+        'item',
+        'day',
+    ]
+    fled_default = {
+        'day': [],
+    }
+
+    @staticmethod
+    async def get_sport(user_sports):
+        weekday = datetime.now().isoweekday()
+        today_sports = {}
+        sport: Sport
+        async for sport in Sport.find({}):
+            if sport['item'] not in user_sports:
+                today_sports[sport['item']] = {
+                    'enable': False,
+                    'message': '未加入到该小组'
+                }
+            elif weekday not in sport['day']:
+                today_sports[sport['item']] = {
+                    'enable': False,
+                    'message': f'仅限每周{",".join([str(x) for x in sport["day"]])}使用'
+                }
+            else:
+                today_sports[sport['item']] = {
+                    'enable': True,
+                    'message': '今日可使用'
+                }
+        return today_sports
+
+
 class Ticket(Model):
     collection_name = 'ticket'
     fled_list = [

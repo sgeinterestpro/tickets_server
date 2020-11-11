@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 
 from middleware import auth_need, Auth
 from model import Ticket, User, UserInit, TicketLog, Message, TicketBatch
-from unit import date_week_start, date_week_end, date_month_start, sport_list, date_month_end
+from unit import date_week_start, date_week_end, date_month_start, date_month_end
 
 
 class TicketHandles:
