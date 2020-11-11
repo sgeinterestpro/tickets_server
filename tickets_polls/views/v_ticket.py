@@ -117,6 +117,10 @@ class TicketHandles:
         if not checker:
             return web.json_response({'code': -1, 'message': '站点信息无效'})
 
+        # 运动项目限制
+        if data['class'] not in request['user_init']['sports']:
+            return web.json_response({'code': -1, 'message': '不能打卡其他组的运动项目'})
+
         # 检查本周领取限额
         this_week_start = date_week_start().strftime('%Y-%m-%d')
         this_week_end = date_week_end().strftime('%Y-%m-%d')

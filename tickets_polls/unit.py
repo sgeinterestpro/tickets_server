@@ -15,7 +15,7 @@ sport_list = {
 }
 
 
-def get_sport():
+def get_sport(sports):
     # Todo 修改为系统设置存到数据库
     weekday = datetime.now().isoweekday()
     return {
@@ -23,7 +23,7 @@ def get_sport():
             'enable': weekday in v,
             'message': '今日可使用' if weekday in v else f'仅限每周{",".join([str(x) for x in v])}使用'
         }
-        for k, v in sport_list.items()
+        for k, v in sport_list.items() if k in sports
     }
 
 

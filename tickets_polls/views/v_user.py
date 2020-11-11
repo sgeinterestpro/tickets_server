@@ -38,13 +38,13 @@ class UserHandles:
 
     @staticmethod
     async def user_info(request: Request) -> StreamResponse:
-        user_info = {}
+        user_info = {'sports': {}}
         user = await User.find_or_insert_one({'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one_by_user(user)
         if user_init is not None:
             user_info.update(user_init.to_json())
+            user_info['sports'] = get_sport(user_init['sports'])
         user_info.update(user.to_json())
-        user_info['sports'] = get_sport()
         # 设置默认用户的角色
         if 'role' in user_info:
             user_info['role'] = ['user'] if not user_info['role'] else user_info['role']
