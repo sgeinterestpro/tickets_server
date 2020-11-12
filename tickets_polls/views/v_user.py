@@ -257,6 +257,9 @@ class UserHandles:
         if not user_init:
             return web.json_response({'code': -2, 'message': '未找到对应的用户'})
 
+        if data['init_id'] == str(request['user_init'].mongo_id) and Auth.admin not in data['role']:
+            return web.json_response({'code': -1, 'message': '无法取消当前帐号的管理员权限'})
+
         old_data = {
             'role': user_init['role'],
             'sports': user_init['sports']
