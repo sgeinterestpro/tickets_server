@@ -144,7 +144,7 @@ class UserHandles:
     async def member_suspend(request: Request) -> StreamResponse:
         data = await request.json()
         if 'init_id' not in data:
-            return web.json_response({'code': -1, 'message': '请求参数错误'})
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
 
         if data['init_id'] == str(request['user']['init_id']):
             return web.json_response({'code': -1, 'message': '无法停用正在使用的账号'})
@@ -153,7 +153,7 @@ class UserHandles:
             'state': 'suspend'
         }})
         if res.matched_count == 0:
-            return web.json_response({'code': -1, 'message': '未找到对应的用户'})
+            return web.json_response({'code': -2, 'message': '未找到对应的用户'})
         if res.modified_count == 0:
             return web.json_response({'code': -3, 'message': '修改用户信息失败'})
 
@@ -167,7 +167,7 @@ class UserHandles:
     async def member_resume(request: Request) -> StreamResponse:
         data = await request.json()
         if 'init_id' not in data:
-            return web.json_response({'code': -1, 'message': '请求参数错误'})
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
 
         if data['init_id'] == str(request['user']['init_id']):
             return web.json_response({'code': -1, 'message': '无法操作正在使用的账号'})
@@ -193,7 +193,7 @@ class UserHandles:
         """
         data = await request.json()
         if 'init_id' not in data:
-            return web.json_response({'code': -1, 'message': '请求参数错误'})
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
 
         if data['init_id'] == str(request['user']['init_id']):
             return web.json_response({'code': -1, 'message': '无法操作正在使用的账号'})
@@ -231,7 +231,7 @@ class UserHandles:
     async def member_delete(request: Request) -> StreamResponse:
         data = await request.json()
         if 'init_id' not in data:
-            return web.json_response({'code': -1, 'message': '请求参数错误'})
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
 
         if data['init_id'] == str(request['user']['init_id']):
             return web.json_response({'code': -1, 'message': '无法删除正在使用的账号'})
@@ -251,11 +251,11 @@ class UserHandles:
 
         data = await request.json()
         if 'init_id' not in data:
-            return web.json_response({'code': -1, 'message': '请求参数错误'})
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
 
         user_init = await UserInit.find_one({'_id': ObjectId(data['init_id'])})
         if not user_init:
-            return web.json_response({'code': -1, 'message': '未找到对应的用户'})
+            return web.json_response({'code': -2, 'message': '未找到对应的用户'})
 
         old_data = {
             'role': user_init['role'],
@@ -268,11 +268,11 @@ class UserHandles:
 
         res = await UserInit.update_one({'_id': ObjectId(data['init_id']), 'state': None}, {'$set': new_data})
         if res.matched_count == 0:
-            return web.json_response({'code': -1, 'message': '未找到对应的用户'})
+            return web.json_response({'code': -3, 'message': '未找到对应的用户'})
         if res.modified_count == 0:
             return web.json_response({'code': -3, 'message': '未修改任何用户数据'})
 
-        _ = await OperateLog.insert_one({'operator_id': request['user']['init_id'], 'option': 'member_suspend',
+        _ = await OperateLog.insert_one({'operator_id': request['user']['init_id'], 'option': 'member_edit',
                                          'param': {data['init_id']: {'old': old_data, 'new': new_data}}})
 
         return web.json_response({'code': 0, 'message': '修改用户成功'})
@@ -285,7 +285,7 @@ class UserHandles:
         """
         data = await request.json()
         if 'init_id' not in data:
-            return web.json_response({'code': -1, 'message': '请求参数错误'})
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
 
         user_info = {}
         user_init = await UserInit.find_one({'_id': ObjectId(data['init_id'])})
