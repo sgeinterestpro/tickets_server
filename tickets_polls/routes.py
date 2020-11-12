@@ -38,6 +38,7 @@ def setup_routes(app: Application) -> None:
     app.router.add_route('*', '/member_delete', UserHandles.member_delete_temp)
     app.router.add_route('*', '/member_suspend', UserHandles.member_suspend)
     app.router.add_route('*', '/member_resume', UserHandles.member_resume)
+    app.router.add_route('*', '/member_edit', UserHandles.member_edit)
     app.router.add_route('*', '/member_find', UserHandles.member_find)
     app.router.add_route('*', '/member_list', UserHandles.member_list)
 
