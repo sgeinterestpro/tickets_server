@@ -38,13 +38,16 @@ class UserHandles:
 
     @staticmethod
     async def user_info(request: Request) -> StreamResponse:
-        user_info = {}
+        """
+        小程序启动，获取当前用户信息，控制页面功能使用
+        """
+        user_info = {'sports': {}}
         user = await User.find_or_insert_one({'wx_open_id': request['open-id']})
         user_init = await UserInit.find_one_by_user(user)
         if user_init is not None:
             user_info.update(user_init.to_json())
+            user_info['sports'] = get_sport(user_init['sports'])
         user_info.update(user.to_json())
-        user_info['sports'] = get_sport()
         # 设置默认用户的角色
         if 'role' in user_info:
             user_info['role'] = ['user'] if not user_info['role'] else user_info['role']
@@ -141,7 +144,7 @@ class UserHandles:
     async def member_suspend(request: Request) -> StreamResponse:
         data = await request.json()
         if 'init_id' not in data:
-            return web.json_response({'code': -1, 'message': '请求参数错误'})
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
 
         if data['init_id'] == str(request['user']['init_id']):
             return web.json_response({'code': -1, 'message': '无法停用正在使用的账号'})
@@ -150,7 +153,7 @@ class UserHandles:
             'state': 'suspend'
         }})
         if res.matched_count == 0:
-            return web.json_response({'code': -1, 'message': '未找到对应的用户'})
+            return web.json_response({'code': -2, 'message': '未找到对应的用户'})
         if res.modified_count == 0:
             return web.json_response({'code': -3, 'message': '修改用户信息失败'})
 
@@ -164,7 +167,7 @@ class UserHandles:
     async def member_resume(request: Request) -> StreamResponse:
         data = await request.json()
         if 'init_id' not in data:
-            return web.json_response({'code': -1, 'message': '请求参数错误'})
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
 
         if data['init_id'] == str(request['user']['init_id']):
             return web.json_response({'code': -1, 'message': '无法操作正在使用的账号'})
@@ -190,7 +193,7 @@ class UserHandles:
         """
         data = await request.json()
         if 'init_id' not in data:
-            return web.json_response({'code': -1, 'message': '请求参数错误'})
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
 
         if data['init_id'] == str(request['user']['init_id']):
             return web.json_response({'code': -1, 'message': '无法操作正在使用的账号'})
@@ -228,7 +231,7 @@ class UserHandles:
     async def member_delete(request: Request) -> StreamResponse:
         data = await request.json()
         if 'init_id' not in data:
-            return web.json_response({'code': -1, 'message': '请求参数错误'})
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
 
         if data['init_id'] == str(request['user']['init_id']):
             return web.json_response({'code': -1, 'message': '无法删除正在使用的账号'})
@@ -244,10 +247,48 @@ class UserHandles:
 
     @staticmethod
     @auth_need(Auth.admin)
-    async def member_find(request: Request) -> StreamResponse:
+    async def member_edit(request: Request) -> StreamResponse:
+
         data = await request.json()
         if 'init_id' not in data:
-            return web.json_response({'code': -1, 'message': '请求参数错误'})
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
+
+        user_init = await UserInit.find_one({'_id': ObjectId(data['init_id'])})
+        if not user_init:
+            return web.json_response({'code': -2, 'message': '未找到对应的用户'})
+
+        if data['init_id'] == str(request['user_init'].mongo_id) and Auth.admin not in data['role']:
+            return web.json_response({'code': -1, 'message': '无法取消当前帐号的管理员权限'})
+
+        old_data = {
+            'role': user_init['role'],
+            'sports': user_init['sports']
+        }
+        new_data = {
+            'role': data['role'],
+            'sports': data['sports']
+        }
+
+        res = await UserInit.update_one({'_id': ObjectId(data['init_id']), 'state': None}, {'$set': new_data})
+        if res.matched_count == 0:
+            return web.json_response({'code': -3, 'message': '未找到对应的用户'})
+        if res.modified_count == 0:
+            return web.json_response({'code': -3, 'message': '未修改任何用户数据'})
+
+        _ = await OperateLog.insert_one({'operator_id': request['user']['init_id'], 'option': 'member_edit',
+                                         'param': {data['init_id']: {'old': old_data, 'new': new_data}}})
+
+        return web.json_response({'code': 0, 'message': '修改用户成功'})
+
+    @staticmethod
+    @auth_need(Auth.admin)
+    async def member_find(request: Request) -> StreamResponse:
+        """
+        用户信息展示页面的数据
+        """
+        data = await request.json()
+        if 'init_id' not in data:
+            return web.json_response({'code': -2, 'message': '请求参数错误'})
 
         user_info = {}
         user_init = await UserInit.find_one({'_id': ObjectId(data['init_id'])})
