@@ -9,7 +9,7 @@ from datetime import timedelta, datetime
 sport_list = {
     'badminton': [2, 4, 5],
     'basketball': [2, 4],
-    'football': [1, 2, 3, 4, 5],
+    'football': [1],
     'swim': [3, 5],
     'yoga': [4],
 }
@@ -22,8 +22,11 @@ def get_sport(sports):
         k: {
             'enable': weekday in v,
             'message': '今日可使用' if weekday in v else f'仅限每周{",".join([str(x) for x in v])}使用'
+        } if k in sports else {
+            'enable': False,
+            'message': '未加入到该小组'
         }
-        for k, v in sport_list.items() if k in sports
+        for k, v in sport_list.items()
     }
 
 
