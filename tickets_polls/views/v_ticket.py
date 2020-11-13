@@ -134,24 +134,11 @@ class TicketHandles:
             return web.json_response({'code': -1, 'message': '不能打卡其他组的运动项目'})
 
         # 检查本周领取限额
-        this_week_start = date_week_start().strftime('%Y-%m-%d')
-        this_week_end = date_week_end().strftime('%Y-%m-%d')
-        count = await Ticket.count({
-            'purchaser': request['user'].mongo_id,
-            'expiry_date': {'$gte': this_week_start, '$lte': this_week_end}
-        })
-        if count >= 3:
+        if await Ticket.week_count(request['user'].mongo_id) >= 3:
             return web.json_response({'code': -1, 'message': '已超过本周领取限额'})
 
         # 检查当日是否已使用过该项目
-        date_now = datetime.now().strftime('%Y-%m-%d')
-        count = await Ticket.count({
-            'class': data['class'],
-            'purchaser': request['user'].mongo_id,
-            'expiry_date': {'$gte': date_now, '$lte': date_now}
-
-        })
-        if count >= 1:
+        if await Ticket.today_count(request['user'].mongo_id, data['class']) >= 1:
             return web.json_response({'code': -1, 'message': '本日已打卡该项目，无法重复打卡'})
 
         # 检查是否满足星期限制
