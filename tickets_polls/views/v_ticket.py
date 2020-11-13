@@ -12,7 +12,7 @@ from aiohttp.abc import Request, StreamResponse
 from cryptography.hazmat.primitives.asymmetric import padding
 
 from middleware import auth_need, Auth
-from model import Ticket, User, UserInit, TicketLog, Message, TicketBatch
+from model import Ticket, User, UserInit, TicketLog, Message, TicketBatch, Sport
 from unit import date_week_start, date_week_end, date_month_start, date_month_end
 
 
@@ -124,7 +124,12 @@ class TicketHandles:
         if not checker.role_check('checker'):
             return web.json_response({'code': -1, 'message': '非法的运动站点'})
 
-        # 运动项目限制
+        # 检查运动项目合法性
+        sport = await Sport.find_one({'item': data['class']})
+        if not sport:
+            return web.json_response({'code': -1, 'message': '不能打卡其他组的运动项目'})
+
+        # 检查运动项目领用权限
         if data['class'] not in request['user_init']['sports']:
             return web.json_response({'code': -1, 'message': '不能打卡其他组的运动项目'})
 
@@ -151,7 +156,7 @@ class TicketHandles:
 
         # 检查是否满足星期限制
         weekday = datetime.now().isoweekday()
-        if weekday not in sport_list.get(data['class'], []):
+        if weekday not in sport['day']:
             return web.json_response({'code': -1, 'message': '今日不可领取该类型的票券'})
 
         # 领取票券
@@ -179,7 +184,7 @@ class TicketHandles:
             {'init_id': request['user']['init_id'], 'option': 'purchase', 'ticket_id': new_ticket.json_id}
         )
         check_time_show = check_time.strftime('%Y{}%m{}%d{} %H:%M:%S').format('年', '月', '日')
-        return web.json_response({'code': 0, 'message': '票券领取成功', 'data': {'time': check_time_show}})
+        return web.json_response({'code': 0, 'message': '运动打卡成功', 'data': {'time': check_time_show}})
 
     @staticmethod
     @auth_need(Auth.user)
