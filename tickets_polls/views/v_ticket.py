@@ -12,7 +12,7 @@ from aiohttp.abc import Request, StreamResponse
 from cryptography.hazmat.primitives.asymmetric import padding
 
 from middleware import auth_need, Auth
-from model import Ticket, User, UserInit, TicketLog, Message, TicketBatch
+from model import Ticket, User, UserInit, TicketLog, Message, TicketBatch, Sport
 from unit import date_week_start, date_week_end, date_month_start, date_month_end
 
 
@@ -113,11 +113,23 @@ class TicketHandles:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
         # 获取扫描员
-        checker = await User.find_one({'_id': data['checker_id']})
+        checker = await UserInit.find_one({'_id': data['checker_id']})
+        if not checker:  # 此处兼容已经打印好的二维码
+            checker_wx = await User.find_one({'_id': data['checker_id']})
+            if not checker_wx:
+                return web.json_response({'code': -1, 'message': '站点信息不存在'})
+            checker = await UserInit.find_one_by_user(checker_wx)
         if not checker:
-            return web.json_response({'code': -1, 'message': '站点信息无效'})
+            return web.json_response({'code': -1, 'message': '无效的运动站点'})
+        if not checker.role_check('checker'):
+            return web.json_response({'code': -1, 'message': '非法的运动站点'})
 
-        # 运动项目限制
+        # 检查运动项目合法性
+        sport = await Sport.find_one({'item': data['class']})
+        if not sport:
+            return web.json_response({'code': -1, 'message': '不能打卡其他组的运动项目'})
+
+        # 检查运动项目领用权限
         if data['class'] not in request['user_init']['sports']:
             return web.json_response({'code': -1, 'message': '不能打卡其他组的运动项目'})
 
@@ -144,7 +156,7 @@ class TicketHandles:
 
         # 检查是否满足星期限制
         weekday = datetime.now().isoweekday()
-        if weekday not in sport_list.get(data['class'], []):
+        if weekday not in sport['day']:
             return web.json_response({'code': -1, 'message': '今日不可领取该类型的票券'})
 
         # 领取票券
@@ -172,7 +184,7 @@ class TicketHandles:
             {'init_id': request['user']['init_id'], 'option': 'purchase', 'ticket_id': new_ticket.json_id}
         )
         check_time_show = check_time.strftime('%Y{}%m{}%d{} %H:%M:%S').format('年', '月', '日')
-        return web.json_response({'code': 0, 'message': '票券领取成功', 'data': {'time': check_time_show}})
+        return web.json_response({'code': 0, 'message': '运动打卡成功', 'data': {'time': check_time_show}})
 
     @staticmethod
     @auth_need(Auth.user)
