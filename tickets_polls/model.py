@@ -12,6 +12,8 @@ from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorCursor
 from pymongo.results import UpdateResult, InsertManyResult, DeleteResult, InsertOneResult
 
+from unit import date_week_start, date_week_end
+
 
 def setup_model(app: Application) -> None:
     if 'db' not in app:
@@ -212,28 +214,6 @@ class Sport(Model):
         'day': [],
     }
 
-    @staticmethod
-    async def get_sport(user_sports):
-        weekday = datetime.now().isoweekday()
-        today_sports = {}
-        sport: Sport
-        async for sport in Sport.find({}):
-            b_join = sport['item'] in user_sports
-            b_open = weekday in sport['day']
-            if b_join:
-                if b_open:
-                    message = '今日可使用'
-                else:
-                    message = f'仅限每周{",".join([str(x) for x in sport["day"]])}使用'
-            else:
-                message = '未加入到该小组'
-            today_sports[sport['item']] = {
-                'enable': b_join and b_open,
-                'joined': b_join,
-                'message': message
-            }
-        return today_sports
-
 
 class Ticket(Model):
     collection_name = 'ticket'
@@ -273,6 +253,41 @@ class Ticket(Model):
                                   raise_time=raise_time).to_object(True) for _ in range(raise_count)]
         res = await Ticket.insert_many(new_ticket_list)
         return res.inserted_ids
+
+    @staticmethod
+    async def week_count(user_id, sport_item=None):
+        this_week_start = date_week_start().strftime('%Y-%m-%d')
+        this_week_end = date_week_end().strftime('%Y-%m-%d')
+        query = {
+            'purchaser': user_id,
+            'expiry_date': {
+                '$gte': this_week_start,
+                '$lte': this_week_end
+            }
+        }
+        if sport_item is not None:
+            query.update({
+                'class': sport_item,
+            })
+        count = await Ticket.count(query)
+        return count
+
+    @staticmethod
+    async def today_count(user_id, sport_item=None):
+        date_now = datetime.now().strftime('%Y-%m-%d')
+        query = {
+            'purchaser': user_id,
+            'expiry_date': {
+                '$gte': date_now,
+                '$lte': date_now
+            }
+        }
+        if sport_item is not None:
+            query.update({
+                'class': sport_item,
+            })
+        count = await Ticket.count(query)
+        return count
 
 
 class TicketCheck(Model):
@@ -363,6 +378,32 @@ class UserInit(Model):
 
     def role_check(self, role) -> bool:
         return True if self['role'] == [] and role == 'user' else role in self['role']
+
+    async def get_sport(self):
+        weekday = datetime.now().isoweekday()
+        today_sports = {}
+        sport: Sport
+
+        async for sport in Sport.find({}):
+            b_join = sport['item'] in self['sports']
+            b_open = weekday in sport['day']
+            b_used = await Ticket.today_count(self.mongo_id, sport['item']) != 0
+            if b_join:
+                if b_open:
+                    if b_used:
+                        message = '以达到此项目今日打卡上限'
+                    else:
+                        message = '今日可使用'
+                else:
+                    message = f'仅限每周{",".join([str(x) for x in sport["day"]])}使用'
+            else:
+                message = '未加入到该小组'
+            today_sports[sport['item']] = {
+                'enable': b_join and b_open and not b_used,
+                'joined': b_join,
+                'message': message
+            }
+        return today_sports
 
     @staticmethod
     async def find_one_by_user(user: User):
