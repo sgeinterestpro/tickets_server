@@ -22,8 +22,7 @@ from bson import ObjectId
 
 from base import EmailSender
 from middleware import Auth, auth_need
-from model import User, UserInit, Captcha, OperateLog
-from unit import get_sport
+from model import User, UserInit, Captcha, OperateLog, Sport
 
 
 def msg(url):
@@ -46,7 +45,7 @@ class UserHandles:
         user_init = await UserInit.find_one_by_user(user)
         if user_init is not None:
             user_info.update(user_init.to_json())
-            user_info['sports'] = get_sport(user_init['sports'])
+            user_info['sports'] = await Sport.get_sport(user_init['sports'])
         user_info.update(user.to_json())
         # 设置默认用户的角色
         if 'role' in user_info:
