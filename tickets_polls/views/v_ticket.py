@@ -113,9 +113,16 @@ class TicketHandles:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
         # 获取扫描员
-        checker = await User.find_one({'_id': data['checker_id']})
+        checker = await UserInit.find_one({'_id': data['checker_id']})
+        if not checker:  # 此处兼容已经打印好的二维码
+            checker_wx = await User.find_one({'_id': data['checker_id']})
+            if not checker_wx:
+                return web.json_response({'code': -1, 'message': '站点信息不存在'})
+            checker = await UserInit.find_one_by_user(checker_wx)
         if not checker:
-            return web.json_response({'code': -1, 'message': '站点信息无效'})
+            return web.json_response({'code': -1, 'message': '无效的运动站点'})
+        if not checker.role_check('checker'):
+            return web.json_response({'code': -1, 'message': '非法的运动站点'})
 
         # 运动项目限制
         if data['class'] not in request['user_init']['sports']:
