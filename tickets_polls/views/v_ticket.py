@@ -112,6 +112,7 @@ class TicketHandles:
         if 'checker_id' not in data or 'class' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
+        checker_wx = None  # id数据转换前过渡
         # 获取扫描员
         checker = await UserInit.find_one({'_id': data['checker_id']})
         if not checker:  # 此处兼容已经打印好的二维码
@@ -123,6 +124,9 @@ class TicketHandles:
             return web.json_response({'code': -1, 'message': '无效的运动站点'})
         if not checker.role_check('checker'):
             return web.json_response({'code': -1, 'message': '非法的运动站点'})
+
+        if not checker_wx:  # id数据转换前过渡
+            checker_wx = await User.find_one({'init_id': checker.mongo_id})  # id数据转换前过渡
 
         # 检查运动项目合法性
         sport = await Sport.find_one({'item': data['class']})
@@ -153,7 +157,7 @@ class TicketHandles:
             'state': 'verified',
             'purchaser': request['user'].mongo_id,
             'purch_time': check_time,
-            'checker': checker.mongo_id,
+            'checker': checker_wx.mongo_id,  # id数据转换前过渡
             'check_time': check_time,
             'expiry_date': check_time.strftime('%Y-%m-%d')
         }
