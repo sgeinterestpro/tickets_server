@@ -38,5 +38,14 @@ def config_database(uri: str, db_name: str) -> None:
     if 'email_1' not in user_init_index:
         db.user_init.create_index('email', unique=True)
 
+    if not db.sport.count():
+        db.sport.insert_many([
+            {'item': 'badminton', 'day': [2, 4, 5]},
+            {'item': 'basketball', 'day': [2, 4]},
+            {'item': 'football', 'day': [1]},
+            {'item': 'swim', 'day': [3, 5]},
+            {'item': 'yoga', 'day': [4]},
+        ])
+
     client.close()
     pass

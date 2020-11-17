@@ -12,8 +12,8 @@ from aiohttp.abc import Request, StreamResponse
 from cryptography.hazmat.primitives.asymmetric import padding
 
 from middleware import auth_need, Auth
-from model import Ticket, User, UserInit, TicketLog, Message, TicketBatch
-from unit import date_week_start, date_week_end, date_month_start, sport_list, date_month_end
+from model import Ticket, User, UserInit, TicketLog, Message, TicketBatch, Sport
+from unit import date_week_start, date_week_end, date_month_start, date_month_end
 
 
 class TicketHandles:
@@ -112,35 +112,42 @@ class TicketHandles:
         if 'checker_id' not in data or 'class' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
+        checker_wx = None  # id数据转换前过渡
         # 获取扫描员
-        checker = await User.find_one({'_id': data['checker_id']})
+        checker = await UserInit.find_one({'_id': data['checker_id']})
+        if not checker:  # 此处兼容已经打印好的二维码
+            checker_wx = await User.find_one({'_id': data['checker_id']})
+            if not checker_wx:
+                return web.json_response({'code': -1, 'message': '站点信息不存在'})
+            checker = await UserInit.find_one_by_user(checker_wx)
         if not checker:
-            return web.json_response({'code': -1, 'message': '站点信息无效'})
+            return web.json_response({'code': -1, 'message': '无效的运动站点'})
+        if not checker.role_check('checker'):
+            return web.json_response({'code': -1, 'message': '非法的运动站点'})
+
+        if not checker_wx:  # id数据转换前过渡
+            checker_wx = await User.find_one({'init_id': checker.mongo_id})  # id数据转换前过渡
+
+        # 检查运动项目合法性
+        sport = await Sport.find_one({'item': data['class']})
+        if not sport:
+            return web.json_response({'code': -1, 'message': '不能打卡其他组的运动项目'})
+
+        # 检查运动项目领用权限
+        if data['class'] not in request['user_init']['sports']:
+            return web.json_response({'code': -1, 'message': '不能打卡其他组的运动项目'})
 
         # 检查本周领取限额
-        this_week_start = date_week_start().strftime('%Y-%m-%d')
-        this_week_end = date_week_end().strftime('%Y-%m-%d')
-        count = await Ticket.count({
-            'purchaser': request['user'].mongo_id,
-            'expiry_date': {'$gte': this_week_start, '$lte': this_week_end}
-        })
-        if count >= 3:
+        if await Ticket.week_count(request['user'].mongo_id) >= 3:
             return web.json_response({'code': -1, 'message': '已超过本周领取限额'})
 
         # 检查当日是否已使用过该项目
-        date_now = datetime.now().strftime('%Y-%m-%d')
-        count = await Ticket.count({
-            'class': data['class'],
-            'purchaser': request['user'].mongo_id,
-            'expiry_date': {'$gte': date_now, '$lte': date_now}
-
-        })
-        if count >= 1:
+        if await Ticket.today_count(request['user'].mongo_id, data['class']) >= 1:
             return web.json_response({'code': -1, 'message': '本日已打卡该项目，无法重复打卡'})
 
         # 检查是否满足星期限制
         weekday = datetime.now().isoweekday()
-        if weekday not in sport_list.get(data['class'], []):
+        if weekday not in sport['day']:
             return web.json_response({'code': -1, 'message': '今日不可领取该类型的票券'})
 
         # 领取票券
@@ -150,7 +157,7 @@ class TicketHandles:
             'state': 'verified',
             'purchaser': request['user'].mongo_id,
             'purch_time': check_time,
-            'checker': checker.mongo_id,
+            'checker': checker_wx.mongo_id,  # id数据转换前过渡
             'check_time': check_time,
             'expiry_date': check_time.strftime('%Y-%m-%d')
         }
@@ -168,7 +175,7 @@ class TicketHandles:
             {'init_id': request['user']['init_id'], 'option': 'purchase', 'ticket_id': new_ticket.json_id}
         )
         check_time_show = check_time.strftime('%Y{}%m{}%d{} %H:%M:%S').format('年', '月', '日')
-        return web.json_response({'code': 0, 'message': '票券领取成功', 'data': {'time': check_time_show}})
+        return web.json_response({'code': 0, 'message': '运动打卡成功', 'data': {'time': check_time_show}})
 
     @staticmethod
     @auth_need(Auth.user)
