@@ -1,5 +1,5 @@
 pymongo
-cryptography==3.1.1
+cryptography==3.3
 openpyxl==3.0.5
 aiohttp==3.6.3
 APScheduler==3.6.0
