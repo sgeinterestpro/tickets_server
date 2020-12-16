@@ -12,7 +12,7 @@ from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorCursor
 from pymongo.results import UpdateResult, InsertManyResult, DeleteResult, InsertOneResult
 
-from unit import date_week_start, date_week_end
+from unit import date_week_start, date_week_end, week_zh
 
 
 def setup_model(app: Application) -> None:
@@ -209,6 +209,7 @@ class Sport(Model):
     fled_list = [
         'item',
         'day',
+        'time',
     ]
     fled_default = {
         'day': [],
@@ -384,7 +385,9 @@ class UserInit(Model):
         today_sports = {}
         sport: Sport
 
-        async for sport in Sport.find({}):
+        async for sport in Sport.aggregate([
+            {'$group': {'_id': '$item', 'item': {'$last': "$item"}, 'day': {'$push': '$day'}}}
+        ]):
             b_join = sport['item'] in self['sports']
             b_open = weekday in sport['day']
             b_used = await Ticket.today_count(self.mongo_id, sport['item']) != 0
@@ -393,9 +396,12 @@ class UserInit(Model):
                     if b_used:
                         message = '以达到此项目今日打卡上限'
                     else:
-                        message = '今日可使用'
+                        sport_now = await Sport.find_one({'item': sport['item'], 'day': weekday})
+                        message = f'今日[{", ".join("-".join(ts) for ts in sport_now["time"])}]可用'
                 else:
-                    message = f'仅限每周{",".join([str(x) for x in sport["day"]])}使用'
+                    sports_iter = Sport.find({'item': sport['item']})
+                    sports_desc = [(s['day'], ','.join('-'.join(t) for t in s['time'])) async for s in sports_iter]
+                    message = "、".join([f"每周{week_zh(d)}[{t}]" for d, t in sports_desc])
             else:
                 message = '未加入到该小组'
             today_sports[sport['item']] = {

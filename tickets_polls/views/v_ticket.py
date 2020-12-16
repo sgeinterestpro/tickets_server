@@ -4,6 +4,7 @@ datetime: 2019-04-22
 author: muumlover
 """
 import base64
+import warnings
 from datetime import datetime, timedelta
 
 import pymongo
@@ -55,6 +56,7 @@ class TicketHandles:
         :param request:
         :return:
         """
+        warnings.warn("some_old_function is deprecated", DeprecationWarning)
 
         # 获取用户信息
         data = await request.json()
@@ -128,10 +130,19 @@ class TicketHandles:
         if not checker_wx:  # id数据转换前过渡
             checker_wx = await User.find_one({'init_id': checker.mongo_id})  # id数据转换前过渡
 
-        # 检查运动项目合法性
-        sport = await Sport.find_one({'item': data['class']})
+        # 检查运动项目是否可用
+        weekday = datetime.now().isoweekday()
+        sport = await Sport.find_one({'item': data['class'], 'day': weekday})
         if not sport:
-            return web.json_response({'code': -1, 'message': '不能打卡其他组的运动项目'})
+            return web.json_response({'code': -1, 'message': '今日不可领取该类型的票券'})
+
+        # 检查是否满足时间限制
+        time = datetime.now().strftime("%H:%M")
+        for timespan in sport['time']:
+            if timespan[0] <= time <= timespan[1]:
+                break
+        else:
+            return web.json_response({'code': -1, 'message': '不能在允许的时间范围以外打卡'})
 
         # 检查运动项目领用权限
         if data['class'] not in request['user_init']['sports']:
@@ -144,11 +155,6 @@ class TicketHandles:
         # 检查当日是否已使用过该项目
         if await Ticket.today_count(request['user'].mongo_id, data['class']) >= 1:
             return web.json_response({'code': -1, 'message': '本日已打卡该项目，无法重复打卡'})
-
-        # 检查是否满足星期限制
-        weekday = datetime.now().isoweekday()
-        if weekday not in sport['day']:
-            return web.json_response({'code': -1, 'message': '今日不可领取该类型的票券'})
 
         # 领取票券
         check_time = datetime.now()
@@ -185,6 +191,7 @@ class TicketHandles:
         :param request:
         :return:
         """
+        warnings.warn("some_old_function is deprecated", DeprecationWarning)
         # todo 判断票券状态是否为已使用或已过期
         data = await request.json()
 
@@ -242,6 +249,8 @@ class TicketHandles:
         :param request:
         :return:
         """
+        warnings.warn("some_old_function is deprecated", DeprecationWarning)
+
         data = await request.json()
 
         if 'ticket_id' not in data or not data['ticket_id']:
@@ -296,6 +305,8 @@ class TicketHandles:
         :param request:
         :return:
         """
+        warnings.warn("some_old_function is deprecated", DeprecationWarning)
+
         # Todo
         data = await request.json()
         if 'ticket_id' not in data or not data['ticket_id']:
