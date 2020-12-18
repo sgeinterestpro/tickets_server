@@ -6,6 +6,12 @@ author: muumlover
 
 from datetime import timedelta, datetime
 
+num_str = "一二三四五六七"
+
+
+def week_zh(i):
+    return num_str[i - 1]
+
 
 def date_fmt_conv(date, fmt_from="%Y-%m-%d", fmt_to="%Y-%m-%d"):
     return datetime.strptime(date, fmt_from).strftime(fmt_to)
