@@ -264,8 +264,7 @@ class Ticket(Model):
             'expiry_date': {
                 '$gte': this_week_start,
                 '$lte': this_week_end
-            },
-            'state': 'verified',
+            }
         }
         if sport_item is not None:
             query.update({
@@ -282,8 +281,7 @@ class Ticket(Model):
             'expiry_date': {
                 '$gte': date_now,
                 '$lte': date_now
-            },
-            'state': 'verified',
+            }
         }
         if sport_item is not None:
             query.update({
@@ -380,9 +378,7 @@ class UserInit(Model):
     }
 
     def role_check(self, role) -> bool:
-        if not self['role']:
-            self['role'] = ['user']
-        return role in self['role']
+        return True if self['role'] == [] and role == 'user' else role in self['role']
 
     async def get_sport(self):
         weekday = datetime.now().isoweekday()

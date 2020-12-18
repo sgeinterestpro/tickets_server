@@ -18,7 +18,7 @@ from aiohttp import web
 from aiohttp.abc import Request, StreamResponse
 
 from middleware import Auth, auth_need
-from model import UserInit, Message, Ticket
+from model import User, Message, Ticket
 
 
 class MessageHandles:
@@ -69,26 +69,26 @@ class MessageHandles:
         if message is None:
             return web.json_response({'code': -1, 'message': '无效的消息'})
 
-        operator = await UserInit.find_one({'_id': message['operator']})
+        operator = await User.find_one({'_id': message['operator']})
         if operator is None:
             _ = await Message.update_one({'_id': message.mongo_id}, {'$set': {
-                'checker': request['user_init'].mongo_id,
+                'checker': request['user'].mongo_id,
                 'state': 'fail'
             }})
             return web.json_response({'code': -1, 'message': '操作发起者已注销', 'data': data})
 
-        if request['user_init'] == operator:
+        if request['user'] == operator:
             return web.json_response({'code': -1, 'message': '不能由操作发起者执行复核操作', 'data': data})
 
         if message['operation'] == 'ticket_generate':
             # 执行增发操作
             raise_count = message['params'].get('count', 0)
-            inserted_ids = await Ticket.generate(operator, raise_count, request['user_init'].mongo_id)  # 新加的
+            inserted_ids = await Ticket.generate(operator, raise_count, request['user'].mongo_id)  # 新加的
             if len(inserted_ids) == 0:
                 return web.json_response({'code': -3, 'message': '票券增发成功'})
             # 更新消息状态
             _ = await Message.update_one({'_id': message.mongo_id}, {'$set': {
-                'checker': request['user_init'].mongo_id,
+                'checker': request['user'].mongo_id,
                 'state': 'success'
             }})
 

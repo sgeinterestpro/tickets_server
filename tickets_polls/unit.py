@@ -13,20 +13,6 @@ def week_zh(i):
     return num_str[i - 1]
 
 
-sport_names = {
-    'badminton': '羽毛球',
-    'basketball': '篮球',
-    'football': '足球',
-    'swim': '游泳',
-    'yoga': '瑜伽',
-    None: '未知'
-}
-
-
-def sport_zh(i):
-    return sport_names[i]
-
-
 def date_fmt_conv(date, fmt_from="%Y-%m-%d", fmt_to="%Y-%m-%d"):
     return datetime.strptime(date, fmt_from).strftime(fmt_to)
 
