@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 
 from middleware import auth_need, Auth
 from model import Ticket, User, UserInit, TicketLog, Message, TicketBatch, Sport
-from unit import date_week_start, date_week_end, date_month_start, date_month_end
+from unit import date_week_start, date_week_end, date_month_start, date_month_end, sport_zh
 
 
 class TicketHandles:
@@ -159,7 +159,7 @@ class TicketHandles:
             'state': 'verified',
             'purchaser': request['user_init'].mongo_id,
             'purch_time': check_time,
-            'checker': checker.mongo_id,  # id数据转换前过渡
+            'checker': checker.mongo_id,
             'check_time': check_time,
             'expiry_date': check_time.strftime('%Y-%m-%d')
         }
@@ -284,7 +284,7 @@ class TicketHandles:
             'init_id': ticket['purchaser']
         })
         purchaser_init = await UserInit.find_one({
-            '_id': purchaser['purchaser']
+            '_id': ticket['purchaser']
         })
         return web.json_response({
             'code': 0, 'message': '票券状态核验通过',
@@ -503,11 +503,12 @@ class TicketHandles:
                 }
                 '''
                 real_name = ticket_log_doc.get('init', {}).get('real_name', None)
-                ticket_id = ticket_log_doc.get('ticket_id', None)[:20]
+                ticket_class = ticket_log_doc.get('ticket', {}).get('class', None)
                 items.append({
-                    'time': str(ticket_log_doc['_id'].generation_time.astimezone()),
-                    'text': f'{real_name} 领取 {ticket_id}',
+                    'time': ticket_log_doc['_id'].generation_time.astimezone().strftime("%Y-%m-%d %H:%M:%S"),
+                    'text': f'{real_name} 打卡 {sport_zh(ticket_class)}',
                 })
+                datetime.now().strftime("%Y%m%D %H:%M:%S")
                 count += 1
         return web.json_response({'code': 0, 'message': '获取票券记录成功', 'count': count, 'items': items})
 
