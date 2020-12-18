@@ -401,7 +401,7 @@ class UserInit(Model):
                 else:
                     sports_iter = Sport.find({'item': sport['item']})
                     sports_desc = [(s['day'], ','.join('-'.join(t) for t in s['time'])) async for s in sports_iter]
-                    message = "、".join([f"每周{week_zh(d)}[{t}]" for d, t in sports_desc])
+                    message = "\n".join([f"每周{week_zh(d)}[{t}]" for d, t in sports_desc])
             else:
                 message = '未加入到该小组'
             today_sports[sport['item']] = {

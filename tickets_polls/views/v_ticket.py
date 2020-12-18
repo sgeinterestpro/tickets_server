@@ -142,7 +142,7 @@ class TicketHandles:
             if timespan[0] <= time <= timespan[1]:
                 break
         else:
-            return web.json_response({'code': -1, 'message': '不能在允许的时间范围以外打卡'})
+            return web.json_response({'code': -1, 'message': '非指定活动时间'})
 
         # 检查运动项目领用权限
         if data['class'] not in request['user_init']['sports']:
