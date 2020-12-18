@@ -51,22 +51,11 @@ class ReportHandles:
         if report_type not in reports:
             return web.json_response({'code': -2, 'message': '报表类型错误'})
 
-        # if 'start' in data and 'end' in data:
-        #     date_start, date_end = data['start'], data['end']
-        #     # 修复不选择日期直接导出报表的BUG
-        #     try:
-        #         datetime.strptime(date_start, "%Y-%m-%d")
-        #         datetime.strptime(date_end, "%Y-%m-%d")
-        #     except ValueError:
-        #         return web.json_response({'code': -1, 'message': '请选择正确的日期'})
-
-        user_init = await UserInit.find_one({'wx_open_id': request['open-id']})
-
         report_class = reports[report_type]
         # noinspection PyBroadException
         try:
             report = report_class(**data.get('params', {}))  # type: ReportBase
-            await report.send(user_init['email'])
+            await report.send(request['user_init']['email'])
         except smtplib.SMTPDataError as err:
             return web.json_response({'code': -3, 'message': err.smtp_error.decode()})
         except (KeyError, TypeError) as err:
@@ -75,4 +64,4 @@ class ReportHandles:
         except Exception as err:
             logging.exception(err)
             return web.json_response({'code': -2, 'message': f'报表生成失败'})
-        return web.json_response({'code': 0, 'message': f'报表发送到{user_init["email"]}成功'})
+        return web.json_response({'code': 0, 'message': f'报表发送到{request["user_init"]["email"]}成功'})
