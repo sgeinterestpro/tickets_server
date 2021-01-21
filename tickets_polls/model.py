@@ -42,6 +42,9 @@ class ModelCursor(object):
     def sort(self, *args, **kwargs) -> 'ModelCursor':
         return ModelCursor(self.cls, self.cursor.sort(*args, **kwargs))
 
+    def limit(self, *args, **kwargs) -> 'ModelCursor':
+        return ModelCursor(self.cls, self.cursor.limit(*args, **kwargs))
+
 
 class Model(object):
     """
@@ -457,3 +460,15 @@ class Email(Model):
                     'used': server.get('used', 0) + 1
                 }})
                 return server
+
+
+class SystemStatus(Model):
+    collection_name = 'system_status'
+    fled_list = [
+        'status',
+        'message',
+        'time',
+    ]
+    fled_default = {
+        'status': 0
+    }

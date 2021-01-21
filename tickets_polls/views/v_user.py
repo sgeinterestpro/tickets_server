@@ -36,6 +36,7 @@ def msg(url):
 class UserHandles:
 
     @staticmethod
+    @auth_need()
     async def user_info(request: Request) -> StreamResponse:
         """
         小程序启动，获取当前用户信息，控制页面功能使用
@@ -55,6 +56,7 @@ class UserHandles:
         return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user_info})
 
     @staticmethod
+    @auth_need()
     async def user_update(request: Request) -> StreamResponse:
         data = await request.json()
         if 'userInfo' not in data:

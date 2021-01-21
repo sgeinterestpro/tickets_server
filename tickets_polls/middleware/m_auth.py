@@ -7,12 +7,13 @@ import json
 import logging
 from typing import Callable, Awaitable
 
+import pymongo
 from aiohttp import web
 from aiohttp.abc import Request, StreamResponse
 from aiohttp.web_exceptions import HTTPForbidden
 from aiohttp.web_middlewares import middleware
 
-from model import User, UserInit
+from model import User, UserInit, SystemStatus
 
 
 class Auth:
@@ -35,6 +36,12 @@ def auth_need(role=None):
     def auth_decorator(func: Callable[[Request], Awaitable[StreamResponse]]):
         async def wrapped_function(request: Request) -> StreamResponse:
             try:
+                async for sys_status in SystemStatus.find({}).sort([('_id', pymongo.DESCENDING)]).limit(1):
+                    if sys_status['status'] != 0:
+                        msg = sys_status['message'] or '系统已停止服务，具体原因请联系管理员'
+                        return HTTPForbidden(reason=msg)
+                    break
+
                 if role is None:
                     return await func(request)
 
