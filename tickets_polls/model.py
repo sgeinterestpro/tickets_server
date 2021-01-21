@@ -42,6 +42,9 @@ class ModelCursor(object):
     def sort(self, *args, **kwargs) -> 'ModelCursor':
         return ModelCursor(self.cls, self.cursor.sort(*args, **kwargs))
 
+    def limit(self, *args, **kwargs) -> 'ModelCursor':
+        return ModelCursor(self.cls, self.cursor.limit(*args, **kwargs))
+
 
 class Model(object):
     """
@@ -264,7 +267,8 @@ class Ticket(Model):
             'expiry_date': {
                 '$gte': this_week_start,
                 '$lte': this_week_end
-            }
+            },
+            'state': 'verified',
         }
         if sport_item is not None:
             query.update({
@@ -281,7 +285,8 @@ class Ticket(Model):
             'expiry_date': {
                 '$gte': date_now,
                 '$lte': date_now
-            }
+            },
+            'state': 'verified',
         }
         if sport_item is not None:
             query.update({
@@ -378,7 +383,9 @@ class UserInit(Model):
     }
 
     def role_check(self, role) -> bool:
-        return True if self['role'] == [] and role == 'user' else role in self['role']
+        if not self['role']:
+            self['role'] = ['user']
+        return role in self['role']
 
     async def get_sport(self):
         weekday = datetime.now().isoweekday()
@@ -453,3 +460,15 @@ class Email(Model):
                     'used': server.get('used', 0) + 1
                 }})
                 return server
+
+
+class SystemStatus(Model):
+    collection_name = 'system_status'
+    fled_list = [
+        'status',
+        'message',
+        'time',
+    ]
+    fled_default = {
+        'status': 0
+    }

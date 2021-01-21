@@ -36,6 +36,7 @@ def msg(url):
 class UserHandles:
 
     @staticmethod
+    @auth_need()
     async def user_info(request: Request) -> StreamResponse:
         """
         小程序启动，获取当前用户信息，控制页面功能使用
@@ -55,6 +56,7 @@ class UserHandles:
         return web.json_response({'code': 0, 'message': '获取用户信息成功', 'data': user_info})
 
     @staticmethod
+    @auth_need()
     async def user_update(request: Request) -> StreamResponse:
         data = await request.json()
         if 'userInfo' not in data:
@@ -134,7 +136,7 @@ class UserHandles:
             return web.json_response({'code': -3, 'message': '保存用户数据失败'})
 
         _ = await OperateLog.insert_one(
-            {'operator_id': request['user']['init_id'], 'option': 'member_add', 'param': res.inserted_id})
+            {'operator_id': request['user_init'].mongo_id, 'option': 'member_add', 'param': res.inserted_id})
 
         return web.json_response({'code': 0, 'message': '添加用户成功'})
 
@@ -145,7 +147,7 @@ class UserHandles:
         if 'init_id' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
-        if data['init_id'] == str(request['user']['init_id']):
+        if data['init_id'] == str(request['user_init'].mongo_id):
             return web.json_response({'code': -1, 'message': '无法停用正在使用的账号'})
 
         res = await UserInit.update_one({'_id': ObjectId(data['init_id']), 'state': None}, {'$set': {
@@ -157,7 +159,7 @@ class UserHandles:
             return web.json_response({'code': -3, 'message': '修改用户信息失败'})
 
         _ = await OperateLog.insert_one(
-            {'operator_id': request['user']['init_id'], 'option': 'member_suspend', 'param': data['init_id']})
+            {'operator_id': request['user_init'].mongo_id, 'option': 'member_suspend', 'param': data['init_id']})
 
         return web.json_response({'code': 0, 'message': '停用用户成功'})
 
@@ -168,7 +170,7 @@ class UserHandles:
         if 'init_id' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
-        if data['init_id'] == str(request['user']['init_id']):
+        if data['init_id'] == str(request['user_init'].mongo_id):
             return web.json_response({'code': -1, 'message': '无法操作正在使用的账号'})
 
         res = await UserInit.update_one({'_id': ObjectId(data['init_id']), 'state': 'suspend'}, {'$set': {
@@ -180,7 +182,7 @@ class UserHandles:
             return web.json_response({'code': -3, 'message': '修改用户信息失败'})
 
         _ = await OperateLog.insert_one(
-            {'operator_id': request['user']['init_id'], 'option': 'member_resume', 'param': data['init_id']})
+            {'operator_id': request['user_init'].mongo_id, 'option': 'member_resume', 'param': data['init_id']})
 
         return web.json_response({'code': 0, 'message': '恢复用户成功'})
 
@@ -194,7 +196,7 @@ class UserHandles:
         if 'init_id' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
-        if data['init_id'] == str(request['user']['init_id']):
+        if data['init_id'] == str(request['user_init'].mongo_id):
             return web.json_response({'code': -1, 'message': '无法操作正在使用的账号'})
 
         user_init = await UserInit.find_one({'_id': ObjectId(data['init_id'])})
@@ -208,7 +210,7 @@ class UserHandles:
                 return web.json_response({'code': -3, 'message': '修改用户信息失败'})
 
             _ = await OperateLog.insert_one(
-                {'operator_id': request['user']['init_id'], 'option': 'member_suspend', 'param': data['init_id']})
+                {'operator_id': request['user_init'].mongo_id, 'option': 'member_suspend', 'param': data['init_id']})
 
             return web.json_response({'code': 0, 'message': '停用用户成功'})
         else:
@@ -221,7 +223,7 @@ class UserHandles:
                 return web.json_response({'code': -3, 'message': '修改用户信息失败'})
 
             _ = await OperateLog.insert_one(
-                {'operator_id': request['user']['init_id'], 'option': 'member_resume', 'param': data['init_id']})
+                {'operator_id': request['user_init'].mongo_id, 'option': 'member_resume', 'param': data['init_id']})
 
             return web.json_response({'code': 0, 'message': '恢复用户成功'})
 
@@ -232,7 +234,7 @@ class UserHandles:
         if 'init_id' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
-        if data['init_id'] == str(request['user']['init_id']):
+        if data['init_id'] == str(request['user_init'].mongo_id):
             return web.json_response({'code': -1, 'message': '无法删除正在使用的账号'})
 
         res = await UserInit.delete_one({'_id': ObjectId(data['init_id'])})
@@ -240,7 +242,7 @@ class UserHandles:
             return web.json_response({'code': -3, 'message': '删除用户数据失败'})
 
         _ = await OperateLog.insert_one(
-            {'operator_id': request['user']['init_id'], 'option': 'member_delete', 'param': data['init_id']})
+            {'operator_id': request['user_init'].mongo_id, 'option': 'member_delete', 'param': data['init_id']})
 
         return web.json_response({'code': 0, 'message': '删除用户成功'})
 

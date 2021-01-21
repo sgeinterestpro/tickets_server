@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 
 from middleware import auth_need, Auth
 from model import Ticket, User, UserInit, TicketLog, Message, TicketBatch, Sport
-from unit import date_week_start, date_week_end, date_month_start, date_month_end
+from unit import date_week_start, date_week_end, date_month_start, date_month_end, sport_zh
 
 
 class TicketHandles:
@@ -31,7 +31,7 @@ class TicketHandles:
         this_week_end = date_week_end().strftime('%Y-%m-%d')
         cursor = Ticket.find({
             'state': {'$ne': 'default'},
-            'purchaser': request['user'].mongo_id,
+            'purchaser': request['user_init'].mongo_id,
             'expiry_date': {'$gte': this_week_start, '$lte': this_week_end}
         })
 
@@ -65,7 +65,7 @@ class TicketHandles:
         this_week_start = date_week_start().strftime('%Y-%m-%d')
         this_week_end = date_week_end().strftime('%Y-%m-%d')
         count = await Ticket.count({
-            'purchaser': request['user'].mongo_id,
+            'purchaser': request['user_init'].mongo_id,
             'purch_time': {'$gte': this_week_start, '$lte': this_week_end}
         })
         if count >= 3:
@@ -83,7 +83,7 @@ class TicketHandles:
         new_value = {
             'class': data['class'],
             'state': 'valid',
-            'purchaser': request['user'].mongo_id,
+            'purchaser': request['user_init'].mongo_id,
             'purch_time': datetime.now(),
             'expiry_date': data['date']
         }
@@ -97,7 +97,7 @@ class TicketHandles:
         # 插入票券记录
         new_ticket = await Ticket.find_one(new_value)
         _ = await TicketLog.insert_one(
-            {'init_id': request['user']['init_id'], 'option': 'purchase', 'ticket_id': new_ticket.json_id})
+            {'init_id': request['user_init'].mongo_id, 'option': 'purchase', 'ticket_id': new_ticket.json_id})
 
         return web.json_response({'code': 0, 'message': '票券领取成功'})
 
@@ -114,7 +114,6 @@ class TicketHandles:
         if 'checker_id' not in data or 'class' not in data:
             return web.json_response({'code': -2, 'message': '请求参数错误'})
 
-        checker_wx = None  # id数据转换前过渡
         # 获取扫描员
         checker = await UserInit.find_one({'_id': data['checker_id']})
         if not checker:  # 此处兼容已经打印好的二维码
@@ -126,9 +125,6 @@ class TicketHandles:
             return web.json_response({'code': -1, 'message': '无效的运动站点'})
         if not checker.role_check('checker'):
             return web.json_response({'code': -1, 'message': '非法的运动站点'})
-
-        if not checker_wx:  # id数据转换前过渡
-            checker_wx = await User.find_one({'init_id': checker.mongo_id})  # id数据转换前过渡
 
         # 检查运动项目是否可用
         weekday = datetime.now().isoweekday()
@@ -149,11 +145,11 @@ class TicketHandles:
             return web.json_response({'code': -1, 'message': '不能打卡其他组的运动项目'})
 
         # 检查本周领取限额
-        if await Ticket.week_count(request['user'].mongo_id) >= 3:
+        if await Ticket.week_count(request['user_init'].mongo_id) >= 3:
             return web.json_response({'code': -1, 'message': '已超过本周领取限额'})
 
         # 检查当日是否已使用过该项目
-        if await Ticket.today_count(request['user'].mongo_id, data['class']) >= 1:
+        if await Ticket.today_count(request['user_init'].mongo_id, data['class']) >= 1:
             return web.json_response({'code': -1, 'message': '本日已打卡该项目，无法重复打卡'})
 
         # 领取票券
@@ -161,9 +157,9 @@ class TicketHandles:
         new_value = {
             'class': data['class'],
             'state': 'verified',
-            'purchaser': request['user'].mongo_id,
+            'purchaser': request['user_init'].mongo_id,
             'purch_time': check_time,
-            'checker': checker_wx.mongo_id,  # id数据转换前过渡
+            'checker': checker.mongo_id,
             'check_time': check_time,
             'expiry_date': check_time.strftime('%Y-%m-%d')
         }
@@ -178,7 +174,7 @@ class TicketHandles:
         # 生成票券使用记录
         new_ticket = await Ticket.find_one(new_value)
         _ = await TicketLog.insert_one(
-            {'init_id': request['user']['init_id'], 'option': 'purchase', 'ticket_id': new_ticket.json_id}
+            {'init_id': request['user_init'].mongo_id, 'option': 'purchase', 'ticket_id': new_ticket.json_id}
         )
         check_time_show = check_time.strftime('%Y{}%m{}%d{} %H:%M:%S').format('年', '月', '日')
         return web.json_response({'code': 0, 'message': '运动打卡成功', 'data': {'time': check_time_show}})
@@ -203,7 +199,7 @@ class TicketHandles:
         if ticket is None:
             return web.json_response({'code': -1, 'message': '无法删除不存在的票券'})
 
-        if request['user'].mongo_id != ticket['purchaser']:
+        if request['user_init'].mongo_id != ticket['purchaser']:
             return web.json_response({'code': -1, 'message': '无法删除他人的票券'})
 
         if ticket['state'] != 'valid':
@@ -215,7 +211,7 @@ class TicketHandles:
 
         # 检查本周删除限额
         count = await Ticket.count({
-            'deleter': request['user'].mongo_id,
+            'deleter': request['user_init'].mongo_id,
             'delete_time': {'$gte': date_week_start(), '$lte': date_week_end()}
         })
         if count >= 3:
@@ -224,11 +220,11 @@ class TicketHandles:
         res = await Ticket.update_one({
             '_id': data['ticket_id'],
             'state': 'valid',
-            'purchaser': request['user'].mongo_id
+            'purchaser': request['user_init'].mongo_id
         }, {
             '$set': {
                 'state': 'delete',
-                'deleter': request['user'].mongo_id,
+                'deleter': request['user_init'].mongo_id,
                 'delete_time': datetime.now(),
             }
         })
@@ -238,7 +234,7 @@ class TicketHandles:
         if res.modified_count == 0:
             return web.json_response({'code': -3, 'message': '更新票券信息失败'})
         _ = await TicketLog.insert_one(
-            {'init_id': request['user']['init_id'], 'option': 'refund', 'ticket_id': data['ticket_id']})
+            {'init_id': request['user_init'].mongo_id, 'option': 'refund', 'ticket_id': data['ticket_id']})
         return web.json_response({'code': 0, 'message': '票券删除成功'})
 
     @staticmethod
@@ -285,10 +281,10 @@ class TicketHandles:
             return web.json_response({'code': -1, 'message': '票券未生效'})
 
         purchaser = await User.find_one({
-            '_id': ticket['purchaser']
+            'init_id': ticket['purchaser']
         })
         purchaser_init = await UserInit.find_one({
-            '_id': purchaser['init_id']
+            '_id': ticket['purchaser']
         })
         return web.json_response({
             'code': 0, 'message': '票券状态核验通过',
@@ -333,7 +329,7 @@ class TicketHandles:
         }, {
             '$set': {
                 'state': 'verified',
-                'checker': request['user'].mongo_id,
+                'checker': request['user_init'].mongo_id,
                 'check_time': datetime.now()
             }
         })
@@ -343,9 +339,12 @@ class TicketHandles:
         if res.modified_count == 0:
             return web.json_response({'code': -3, 'message': '更新票券信息失败'})
 
-        purchaser = await User.find_one({'_id': ticket['purchaser']})
-        _ = await TicketLog.insert_one(
-            {'init_id': purchaser['init_id'], 'option': 'checked', 'ticket_id': data['ticket_id']})
+        purchaser = await UserInit.find_one({'_id': ticket['purchaser']})
+        _ = await TicketLog.insert_one({
+            'init_id': purchaser.mongo_id,
+            'option': 'checked',
+            'ticket_id': data['ticket_id']
+        })
 
         return web.json_response({'code': 0, 'message': '票券检票成功'})
 
@@ -363,7 +362,7 @@ class TicketHandles:
         # 改为需二次复核的方式
         _ = await Message.insert_one({
             'operation': Message.Operation.ticket_generate,
-            'operator': request['user'].mongo_id,
+            'operator': request['user_init'].mongo_id,
             'checker': None,
             'content': f'{request["user_init"]["real_name"]}增发{data_count}张票券',
             'params': {'count': data_count},
@@ -504,11 +503,12 @@ class TicketHandles:
                 }
                 '''
                 real_name = ticket_log_doc.get('init', {}).get('real_name', None)
-                ticket_id = ticket_log_doc.get('ticket_id', None)[:20]
+                ticket_class = ticket_log_doc.get('ticket', {}).get('class', None)
                 items.append({
-                    'time': str(ticket_log_doc['_id'].generation_time.astimezone()),
-                    'text': f'{real_name} 领取 {ticket_id}',
+                    'time': ticket_log_doc['_id'].generation_time.astimezone().strftime("%Y-%m-%d %H:%M:%S"),
+                    'text': f'{real_name} 打卡 {sport_zh(ticket_class)}',
                 })
+                datetime.now().strftime("%Y%m%D %H:%M:%S")
                 count += 1
         return web.json_response({'code': 0, 'message': '获取票券记录成功', 'count': count, 'items': items})
 
@@ -531,14 +531,14 @@ class TicketHandles:
             date_start = datetime.strptime(datetime.now().strftime('%Y-%m-%d'), '%Y-%m-%d')
             date_end = datetime.strptime(datetime.now().strftime('%Y-%m-%d'), '%Y-%m-%d') + timedelta(days=1)
             cursor = Ticket.find({
-                'checker': request['user'].mongo_id,
+                'checker': request['user_init'].mongo_id,
                 'check_time': {'$gte': date_start, '$lte': date_end},
             })
 
         count, items = 0, []
         async for ticket in cursor:
-            purchaser_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['purchaser']}))
-            checker_init = await UserInit.find_one_by_user(await User.find_one({'_id': ticket['checker']}))
+            purchaser_init = await UserInit.find_one({'_id': ticket['purchaser']})
+            checker_init = await UserInit.find_one({'_id': ticket['checker']})
             items.append({
                 'id': f'票券编号：{ticket.json_id[:20]}',
                 'user': f'运动人员：{purchaser_init["real_name"]}',
@@ -581,14 +581,11 @@ class TicketHandles:
         }]
 
         async for checker_init in UserInit.find({'role': {'$all': ['checker']}}):
-            checker = await User.find_one({'init_id': checker_init.mongo_id})
-            if checker is None:
-                continue
             for item in items:
                 item['items'].append({
                     'name': checker_init['real_name'],
                     'count': await Ticket.count({
-                        'checker': checker.mongo_id,
+                        'checker': checker_init.mongo_id,
                         'check_time': {'$gte': item['start_'], '$lte': item['end_']}
                     })
                 })
